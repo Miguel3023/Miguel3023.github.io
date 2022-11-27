@@ -3,7 +3,7 @@ title: Precious Writeup
 author: miguel3023
 date: 2022-11-19
 categories: [Writeup, HTB]
-tags: [Linux, CTF, Easy, CommandInjection]
+tags: [Linux, CTF, Easy, CommandInjection, Sudoers, RCE]
 image:
   path: ../../assets/img/commons/Precious/Precious.png
   width: 800
