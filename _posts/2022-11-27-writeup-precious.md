@@ -1,7 +1,7 @@
 ---
 title: Precious Writeup
 author: miguel3023
-date: 2022-11-19
+date: 2022-11-27
 categories: [Writeup, HTB]
 tags: [Linux, CTF, Easy, CommandInjection, Sudoers, RCE]
 image:
@@ -9,6 +9,8 @@ image:
   width: 800
   height: 450 
 ---
+
+En esta máquina veremos cómo se acontece un RCE en base a un apartado donde podemos subir archivos, inyectamos comandos para entrar en la máquina y abusamos del privilegio de sudoers para obtener sesión como root 
 
 ## Reconocimiento
 
