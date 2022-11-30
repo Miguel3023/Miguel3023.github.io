@@ -3,12 +3,14 @@ title: PhotoBomb Writeup
 author: miguel3023
 date: 2022-11-29
 categories: [Writeup, HTB]
-tags: [Linux, CTF, Easy]
+tags: [Linux, CTF, Easy, CommandInjection, Pathhijacking]
 image:
   path: ../../assets/img/commons/PhotoBomb/PhotoBomb.png
   width: 800
   height: 450 
 ---
+
+En esta máquina veremos un information leakage para ver credenciales, inyectaremos comandos a través de una petición en la información de una descarga y haremos un Pathhijacking para convertirnos en root.
 
 ## Reconocimiento
 
@@ -83,6 +85,7 @@ function init() {
 window.onload = init;
 
 ```
+## Intrusión
 
 Ahora veremos que podemos descargar imágenes. Veremos cómo se realiza esa solicitud con **BurpSuite**
 
