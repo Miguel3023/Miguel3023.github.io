@@ -164,7 +164,7 @@ Podemos ver un script "bot.py" y que se conecta a la base de datos
   r = cursor.fetchall() 
 ```
 
-Si hacemos sudo -l podemos ver que tenemos un script que podemos ejecutar de manera privilegiada, si lo vemos nos muestra lo siguiente:`
+Si hacemos sudo -l podemos ver que tenemos un script que podemos ejecutar de manera privilegiada, si lo vemos nos muestra lo siguiente:
 
 ```python
  # Grab links
@@ -179,7 +179,7 @@ Si hacemos sudo -l podemos ver que tenemos un script que podemos ejecutar de man
  Xnew = getVec(data)
 ```
 
-También podemos ver esto 
+También podemos una librería **tensorflow** y si buscamos encontramos cómo vulnerarlo para [este](https://github.com/advisories/GHSA-75c9-jrh4-79mc)
 
 ```python
 def assessData(i):
