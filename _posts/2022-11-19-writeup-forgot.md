@@ -3,12 +3,14 @@ title: Forgot Writeup
 author: miguel3023
 date: 2022-11-19
 categories: [Writeup, HTB]
-tags: [Linux, CTF, Medium]
+tags: [Linux, CTF, Medium, Cache Deception, Sudoers, Host Attack]
 image:
   path: ../../assets/img/commons/Forgot/Forgot.png
   width: 800
   height: 450 
 ---
+
+En esta máquina veremos un "Host Header attack" para pasar un panel de login. Luego un "web cache deception" para obtener acceso como usuario no privilegiado en la web. Por último abusamos del privilegio sudoers para obtener root.
 
 ## Reconocimiento
 
@@ -143,6 +145,8 @@ Listo, ya hemos hecho un "cache deception attack" y capturado la cookie de admin
 
 ![Burpsuite]({{ 'assets/img/commons/Forgot/credenciales.png' | relative_url }}){: .center-image }
 _Credenciales_
+
+## Privesc
 
 Nos conectamos por ssh
 
