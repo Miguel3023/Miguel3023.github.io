@@ -3,7 +3,7 @@ title: Forgot Writeup
 author: miguel3023
 date: 2022-11-19
 categories: [Writeup, HTB]
-tags: [Linux, CTF, Medium, Cache Deception, Sudoers, Host Attack]
+tags: [Linux, CTF, Medium, Cache Deception, Sudoers, Host Header Attack]
 image:
   path: ../../assets/img/commons/Forgot/Forgot.png
   width: 800
