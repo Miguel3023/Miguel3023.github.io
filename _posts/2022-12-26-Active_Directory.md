@@ -2,7 +2,8 @@
 title: Active Directory
 author: miguel3023
 date: 2022-12-26
-categories: [Notes Active-Directory]
+categories: [Notes]
+tags: [Active Directory]
 ---
 ## CrackMapexec
 
