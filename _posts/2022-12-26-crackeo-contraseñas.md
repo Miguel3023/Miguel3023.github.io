@@ -15,3 +15,11 @@ En este ejemplo es con un hash en formato md5. Si el hash no es md5, haciendole 
 ```
 ❯ hashcat -m 0 hash /usr/share/wordlists/rockyou.txt
 ```
+
+## Hydra
+
+Con esta herramienta podemos probrar contraseñas para entrar por ssh, podemos especificarle tanto un diccionario de contraseñas, como de usuarios de la siguiente forma
+
+```
+❯ hydra -L users.txt -P passwords.txt ssh://<ip>
+```
