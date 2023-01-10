@@ -208,7 +208,7 @@ También podemos ver un archivo "activate.php", si lo guardamos y lo visualizamo
 
 ```
 
-Vemos que genera un código de 32 dígitos y en base a la hora del sistema cuando tramitamos la petición de creación de usuario. Esto gracias a la función "srand" que funciona como semilla de hora. Creamos un usuario e interceptamos la petición con burpsuite. Ahora con un script de php podemos intentar fuzzear por los códigos aleatorios que nos genera el script 
+Vemos que genera un código de 32 dígitos y en base a la hora del sistema cuando tramitamos la petición de creación de usuario. Esto gracias a la función "srand" que funciona como semilla de hora. Creamos un usuario e interceptamos la petición con burpsuite y para el script de php copiamos la fecha que nos da el servidor y la ponemos en el script. Ahora con un script de php podemos intentar fuzzear por los códigos aleatorios que nos genera el script 
 
 ```php
 <?php
