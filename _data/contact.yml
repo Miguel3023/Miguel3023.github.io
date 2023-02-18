@@ -12,20 +12,8 @@
   noblank: true            # open link in current tab
   url: 'https://app.hackthebox.com/profile/907376'
 -
-#  type: rss
-#  icon: 'fas fa-rss'
-#  noblank: true
-
-# Uncomment and complete the url below to enable more contact options
-# -
-#   type: mastodon
-#   icon: 'fab fa-mastodon'   # icons powered by <https://fontawesome.com/>
-#   url:  ''                  # Fill with your mastodon account page
 -
   type: linkedin
   icon: 'fab fa-linkedin'   # icons powered by <https://fontawesome.com/>
   url:  'https://www.linkedin.com/in/miguel-malag%C3%B3n-8547301b0/'                  # Fill with your Linkedin homepage
 -
-#   type: stack-overflow
-#   icon: 'fab fa-stack-overflow'
-#   url:  ''                  # Fill with your stackoverflow homepage
