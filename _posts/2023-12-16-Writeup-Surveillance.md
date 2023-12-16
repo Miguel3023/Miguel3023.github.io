@@ -44,7 +44,7 @@ http://10.10.11.245 [302 Found] Country[RESERVED][ZZ], HTTPServer[Ubuntu Linux][
 ERROR Opening: http://surveillance.htb/ - no address for surveillance.htb
 ```
 
-Se observa que hay un dominio de por medio y no carga la Web ya que el dominio hay que añadirlo al ficher **/etc/hosts** junto a la IP para que a nivel de DNS se resuelva dicho dominio a la IP.
+Se observa que hay un dominio de por medio y no carga la Web ya que el dominio hay que añadirlo al fichero **/etc/hosts** junto a la IP para que a nivel de DNS se resuelva dicho dominio a la IP.
 
 ```bash
 ❯ echo "10.10.11.245 surveillance.htb" >> /etc/hosts
@@ -62,3 +62,8 @@ Se observa que hay un dominio de por medio y no carga la Web ya que el dominio h
     10.10.11.245 surveillance.htb
 
 ```
+
+Posteriormente se visualiza la Web para ver qué contiene
+
+![Burpsuite]({{ 'assets/img/commons/Surveillance/Web.png' | relative_url }}){: .center-image }
+_Visualizando la Web_
