@@ -136,7 +136,7 @@ _Craft CMS CVE_
 
 Luego buscando por el CVE correspondiente encontré un [POC](https://gist.github.com/gmh5225/8fad5f02c2cf0334249614eb80cbf4ce) el cual contiene un script en Python para la explotación de la vulnerabilidad, sin embargo, yo realicé algunas modificaciones.
 
-Pero antes de continuar con el script, voy a explicar a manera de como entendí cómo sucede todo por detrás, porque soy un curioso y la curiosidad mato al...
+Pero antes de continuar con el script, voy a explicar la manera de como entendí cómo sucede todo por detrás, porque soy un curioso y la curiosidad mato al ...
 
 Primeramente, dentro del POC hay un [link](https://blog.calif.io/p/craftcms-rce) donde se nos explica la vulnerabilidad un poco más en detalle. Para resumir todo, básicamente lo que se hace por detrás es que se puede crear un **Objeto** gracias a los distintos métodos que hay corriendo. Dentro de esos métodos hay uno el cual es **\yii\rbac\PhpManager::loadFromFile** que lo que hace es cargar datos desde un archivo, el archivo que indicaremos en el script.
 
@@ -153,11 +153,21 @@ Una vez comprendido esto, lo que haremos será crear el archivo MSL con formato 
 ```python
 #!/usr/bin/env python3
 
+from termcolor import colored
 import argparse
 import requests
-import re
-from termcolor import colored
+import signal
 import time
+import sys
+import re
+
+
+def leaving(sig, frame):
+
+    print(colored("\n[!] Saliendo...\n"))
+    sys.exit(1)
+
+signal.signal(signal.SIGINT, leaving)
 
 proxy = {'http':'http://127.0.0.1:8080'}
 
@@ -254,4 +264,13 @@ def main():
 if __name__=='__main__':
 
     main()
+
 ```
+
+Una vez ejecutado el script, estamos dentro de la máquina. Después de buscar un largo rato por algún archivo interesante en el servidor, encontré **surveillance--2023-10-17-202801--v4.4.14.sql.zip** bajo la ruta **/var/www/html/craft/storage/backups**. Lo que haré será traerme ese archivo comprimido a mi equipo y descomprimirlo.
+
+Ya que es un archivo muy grande al descomprimirlo, lo que haré será grepear por "username" y luego por el usuario que encontré el cual es "Matthew" y veremos la contraseña del usuario cifrada.
+
+
+![CommandGrep]({{ 'assets/img/commons/Surveillance/database.png' | relative_url }}){: .center-image }
+_Grep DataBase File_
